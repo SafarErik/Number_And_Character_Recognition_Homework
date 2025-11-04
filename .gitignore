@@ -210,6 +210,6 @@ __marimo__/
 # Ignore data files
 *.csv
 *.npy
-train1/
+data_raw/Train1/
 test1/
 adatok/
