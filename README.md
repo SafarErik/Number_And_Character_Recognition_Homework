@@ -11,13 +11,28 @@ The training and testing data are not included in this repository due to their s
 
 The final folder structure should look like this:
 ```
-project-root/
-├── train1/
-│   ├── Sample001/
-│   ├── Sample002/
-│   └── ... (további minták)
-├── .gitignore
-├── data_preprocessing.py
-├── train.py
+character-recognition/
+├── data_raw/
+│   ├── train/
+│   │   ├── Sample001/
+│   │   └── ...
+│   └── test/
+│       └── ...
+├── data_processed/
+│   ├── train_features.npy
+│   ├── train_labels.npy
+│   ├── test_features.npy
+│   ├── test_labels.npy
+├── results/
+│   ├── simple_cnn_accuracy.png
+│   ├── advanced_cnn_report.txt
+│   └── advanced_cnn_model.h5
+├── src/
+│   ├── __init__.py
+│   ├── data_preprocessing.py   (A nyers képek átalakítója)
+│   ├── utils.py                (Adatbetöltő és plot-oló segédfüggvények)
+│   ├── models.py               (Itt definiálod az MLP, CNN, stb. modelleket)
+│   └── train.py                (A fő szkript, amit futtatsz)
+└── .gitignore
 └── README.md
 ```
