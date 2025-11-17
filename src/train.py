@@ -3,8 +3,10 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
+from sklearn.metrics import classification_report
 import argparse
 import pandas as pd
+import datetime
 
 # Saját modulok importálása
 from utils import load_data_for_training_and_prediction as load_data
@@ -12,12 +14,16 @@ from models import build_simple_cnn, build_advanced_cnn, build_keras_mlp
 from visualize import save_history_plot, save_misclassified_plot
 
 
-# --- 1. Konfiguráció és Parancssori Argumentumok ---
+# --- 1. Konfiguráció ---
 def parse_args():
     parser = argparse.ArgumentParser(description='Karakterfelismerő modell tanítása.')
     parser.add_argument('--model', type=str, default='advanced',
                         choices=['simple', 'advanced', 'mlp'],
                         help='A használni kívánt modell típusa (default: advanced)')
+
+    parser.add_argument('--run_name', type=str, default=None,
+                        help='A kísérlet neve (ez lesz az alkönyvtár neve).')
+
     parser.add_argument('--epochs', type=int, default=50,
                         help='A tanítási epoch-ok maximális száma (default: 50)')
     parser.add_argument('--batch_size', type=int, default=64,
@@ -30,119 +36,104 @@ def parse_args():
 def main():
     args = parse_args()
 
-    MODEL_NAME = f"model_{args.model}_v2"
-    RESULTS_DIR = 'results'
-    os.makedirs(RESULTS_DIR, exist_ok=True)
+    BASE_RESULTS_DIR = 'results'
+
+    if args.run_name:
+        RUN_NAME = args.run_name
+    else:
+        # Ha nem adtál meg nevet, generál egyet, pl. "advanced_20251117_214500"
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        RUN_NAME = f"{args.model}_{timestamp}"
+
+    RUN_RESULTS_DIR = os.path.join(BASE_RESULTS_DIR, RUN_NAME)
+    os.makedirs(RUN_RESULTS_DIR, exist_ok=True)
+
+    print(f"\n--- ÚJ FUTTATÁS INDUL ---")
+    print(f"Kísérlet neve: {RUN_NAME}")
+    print(f"Minden eredmény ide lesz mentve: {RUN_RESULTS_DIR}")
+
 
     # --- 2. Adatok betöltése ---
     print("Adatok betöltése...")
     data = load_data()
-    if data is None:
-        return
+    if data is None: return
 
     (X_train, y_train), (X_val, y_val, y_val_labels), X_test, num_classes, test_filenames = data
-
     input_shape = X_train.shape[1:]
 
-    print(f"Tanító adatok: {X_train.shape}")
-    print(f"Validációs adatok: {X_val.shape}")
-    print(f"Predikciós (teszt) adatok: {X_test.shape}")
-    print(f"Osztályok száma: {num_classes}")
-
-    # --- 3. Modell kiválasztása és építése ---
-    print(f"Modell építése: {args.model}")
+    # --- 3. Modell építése ---
     if args.model == 'simple':
         model = build_simple_cnn(input_shape, num_classes)
     elif args.model == 'advanced':
         model = build_advanced_cnn(input_shape, num_classes)
     elif args.model == 'mlp':
         model = build_keras_mlp(input_shape, num_classes)
-
     model.summary()
 
     # --- 4. Callback-ek ---
     early_stopper = EarlyStopping(monitor='val_accuracy', patience=10,
                                   restore_best_weights=True, verbose=1)
 
-    model_checkpoint_path = os.path.join(RESULTS_DIR, f"{MODEL_NAME}_best.keras")
+    # A mentési útvonal egy alkönyvtárba mutat
+    model_checkpoint_path = os.path.join(RUN_RESULTS_DIR, "best_model.keras")
     model_checkpoint = ModelCheckpoint(model_checkpoint_path, monitor='val_accuracy',
                                        save_best_only=True, verbose=1)
 
-    # Ha a 'val_loss' 3 epoch-on keresztül nem javul,
-    # csökkenti a tanulási rátát a felére (factor=0.5).
-    reduce_lr = ReduceLROnPlateau(
-        monitor='val_loss',
-        factor=0.5,
-        patience=3,
-        min_lr=0.00001,
-        verbose=1
-    )
-
-    # --- 5. Tanítás ---
-    print(f"\n--- Tanítás indítása ({args.epochs} epoch) ---")
+    reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5,
+                                  patience=3, min_lr=0.00001, verbose=1)
 
     callbacks_list = [early_stopper, model_checkpoint, reduce_lr]
 
+    # --- 5. Tanítás ---
+    print(f"\n--- Tanítás indítása ({args.epochs} epoch) ---")
     if args.no_augmentation or args.model == 'mlp':
-        if args.model != 'mlp':
-            print("Adatbővítés KIkapcsolva.")
-
-        history = model.fit(
-            X_train, y_train,
-            epochs=args.epochs,
-            batch_size=args.batch_size,
-            validation_data=(X_val, y_val),
-            callbacks=callbacks_list
-        )
+        history = model.fit(X_train, y_train, epochs=args.epochs, batch_size=args.batch_size,
+                            validation_data=(X_val, y_val), callbacks=callbacks_list)
     else:
         print("Adatbővítés BEkapcsolva.")
-        datagen = ImageDataGenerator(
-            rotation_range=10, width_shift_range=0.1,
-            height_shift_range=0.1, zoom_range=0.1
-        )
+        datagen = ImageDataGenerator(rotation_range=10, width_shift_range=0.1,
+                                     height_shift_range=0.1, zoom_range=0.1)
         datagen.fit(X_train)
-
-        history = model.fit(
-            datagen.flow(X_train, y_train, batch_size=args.batch_size),
-            epochs=args.epochs,
-            validation_data=(X_val, y_val),
-            callbacks=callbacks_list
-
-        )
+        history = model.fit(datagen.flow(X_train, y_train, batch_size=args.batch_size),
+                            epochs=args.epochs, validation_data=(X_val, y_val),
+                            callbacks=callbacks_list)
 
     print("--- Tanítás befejezve ---")
 
     print(f"Legjobb modell betöltése innen: {model_checkpoint_path}")
     model = tf.keras.models.load_model(model_checkpoint_path)
 
-    # --- 6. PREDIKCIÓ a CÍMKE NÉLKÜLI TESZT adatokon ---
+    # --- 6. PREDIKCIÓ ---
     print("\n--- Végső predikció indítása a TESZT adatokon ---")
     y_pred_probs = model.predict(X_test)
-    y_pred = np.argmax(y_pred_probs, axis=1)  # Valószínűségekből osztály indexek (pl. 0,1,19 stb.)
+    y_pred = np.argmax(y_pred_probs, axis=1)
     print("Predikciók elkészültek.")
 
-    # --- 7. Eredmények mentése ---
-    print("Eredmények mentése a 'results/' mappába...")
+    # --- 7. Eredmények mentése (alkönyvtárba) ---
+    print(f"Eredmények mentése a '{RUN_RESULTS_DIR}' mappába...")
 
-    # --- BEADÁSI FÁJL LÉTREHOZÁSA ---
-    submission_df = pd.DataFrame({
-        'class': y_pred,
-        'TestImage': test_filenames
-    })
-    submission_path = os.path.join(RESULTS_DIR, f"{MODEL_NAME}_submission.csv")
+    # Beadási fájl
+    submission_df = pd.DataFrame({'class': y_pred, 'TestImage': test_filenames})
+    submission_path = os.path.join(RUN_RESULTS_DIR, "submission.csv")
     submission_df.to_csv(submission_path, sep=';', index=False)
-    print(f"Beadási fájl (submission) elmentve: {submission_path}")
+    print(f"Beadási fájl elmentve: {submission_path}")
 
-    # A tanítási görbét elmentjük.
-    save_history_plot(history, os.path.join(RESULTS_DIR, f"{MODEL_NAME}_history.png"))
+    # Ábrák
+    save_history_plot(history, os.path.join(RUN_RESULTS_DIR, "history.png"))
+    save_misclassified_plot(model, X_val, y_val_labels,
+                            os.path.join(RUN_RESULTS_DIR, "misclassified.png"))
 
-    # Hibaelemző ábra mentése
-    save_misclassified_plot(
-        model,
-        X_val,  # A validációs képek
-        y_val_labels,  # Az eredeti, NEM one-hot validációs címkék
-        os.path.join(RESULTS_DIR, f"{MODEL_NAME}_misclassified.png")
-    )
+    # Riport (validációs adatokon)
+    report_path = os.path.join(RUN_RESULTS_DIR, "validation_report.txt")
+    try:
+        val_pred_probs = model.predict(X_val)
+        val_pred = np.argmax(val_pred_probs, axis=1)
+        report = classification_report(y_val_labels, val_pred)
+        with open(report_path, 'w') as f:
+            f.write(report)
+        print(f"Validációs riport elmentve: {report_path}")
+    except Exception as e:
+        print(f"Validációs riport mentése sikertelen: {e}")
 
     print("\n--- Folyamat befejezve ---")
 
