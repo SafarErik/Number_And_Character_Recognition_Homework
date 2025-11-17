@@ -212,5 +212,7 @@ __marimo__/
 *.npy
 data_raw/train/
 data_raw/test/
+results/
+data_processed/
 test1/
 adatok/
