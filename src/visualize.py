@@ -53,3 +53,59 @@ def save_confusion_matrix_plot(y_true, y_pred, file_path):
         plt.close()
     except Exception as e:
         print(f"Hiba a konfúziós mátrix mentésekor: {e}")
+
+
+def save_misclassified_plot(model, X_val, y_val_true_labels, file_path, num_images=25):
+    """
+    Kiválaszt véletlenszerűen elrontott képeket a validációs halmazból
+    és elmenti őket egy ábrára.
+
+    Args:
+        model: A betanított Keras modell.
+        X_val: A validációs képadatok (normalizálva, 4D formátumban).
+        y_val_true_labels: A validációs címkék (NEM one-hot, sima számok, pl. 19, 45).
+        file_path: A mentés helye.
+        num_images: Hány képet mutasson.
+    """
+    print("Elrontott jóslatok keresése a validációs adatokon...")
+    # Jóslatok készítése a validációs adatokra
+    y_pred_probs = model.predict(X_val)
+    y_pred_labels = np.argmax(y_pred_probs, axis=1)  # A jósolt indexek
+
+    # Az elrontott képek indexeinek megkeresése
+    misclassified_indices = np.where(y_pred_labels != y_val_true_labels)[0]
+
+    if len(misclassified_indices) == 0:
+        print("Gratulálok! A modell nem hibázott a validációs adatokon.")
+        return
+
+    # Véletlenszerű mintavétel az elrontottakból
+    num_to_sample = min(num_images, len(misclassified_indices))
+    selected_indices = np.random.choice(misclassified_indices, num_to_sample, replace=False)
+
+    # Ábra előkészítése (5 oszlop)
+    rows = int(np.ceil(num_to_sample / 5))
+    fig, axes = plt.subplots(rows, 5, figsize=(15, 3 * rows + 3))
+    axes = axes.flatten()
+
+    for i, idx in enumerate(selected_indices):
+        # Kép visszaalakítása 2D-be és 0-255 skálára
+        img = (X_val[idx].reshape(28, 28) * 255).astype(np.uint8)
+
+        true_label = y_val_true_labels[idx]
+        pred_label = y_pred_labels[idx]
+
+        ax = axes[i]
+        ax.imshow(img, cmap='gray')
+        ax.set_title(f"Valós: {true_label}\nJósolt: {pred_label}", color='red')
+        ax.axis('off')
+
+    # Üres ábrák elrejtése
+    for j in range(i + 1, len(axes)):
+        axes[j].axis('off')
+
+    plt.tight_layout(pad=2.0)
+    plt.suptitle("Példák elrontott jóslatokra", fontsize=16, y=1.03)
+    plt.savefig(file_path)
+    print(f"Elrontott jóslatok ábrája elmentve: {file_path}")
+    plt.close()
