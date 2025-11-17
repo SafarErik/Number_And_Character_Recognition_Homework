@@ -2,7 +2,7 @@
 
 Ez a projekt egy Konvolúciós Neurális Hálót (CNN) tanít be, ami képes felismerni kézzel írott számokat és betűket. A projekt professzionális, skálázható Python csomagstruktúrát használ.
 
-## 🚀 Futtatás
+## Futtatás
 
 ### 1. Telepítés
 
