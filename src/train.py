@@ -64,7 +64,7 @@ def main():
     early_stopper = EarlyStopping(monitor='val_accuracy', patience=10,
                                   restore_best_weights=True, verbose=1)
 
-    model_checkpoint_path = os.path.join(RESULTS_DIR, f"{MODEL_NAME}_best.h5")
+    model_checkpoint_path = os.path.join(RESULTS_DIR, f"{MODEL_NAME}_best.keras")
     model_checkpoint = ModelCheckpoint(model_checkpoint_path, monitor='val_accuracy',
                                        save_best_only=True, verbose=1)
 
@@ -92,8 +92,7 @@ def main():
             datagen.flow(X_train, y_train, batch_size=args.batch_size),
             epochs=args.epochs,
             validation_data=(X_val, y_val),
-            callbacks=[early_stopper, model_checkpoint],
-            steps_per_epoch=len(X_train) // args.batch_size
+            callbacks=[early_stopper, model_checkpoint]
         )
 
     print("--- Tanítás befejezve ---")
