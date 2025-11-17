@@ -22,7 +22,8 @@ pip install tensorflow numpy pillow tqdm scikit-learn matplotlib seaborn
     │   ├── Sample002/ (pl. '1' képei)
     │   └── ...
     └── test/
-        ├── Sample001/
+        ├── Image001.png
+        ├── Image002.png
         └── ...
     ```
 

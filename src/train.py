@@ -3,13 +3,13 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
-from sklearn.metrics import classification_report
-import argparse  # Parancssori argumentumok kezeléséhez
+import argparse
+import pandas as pd
 
 # Saját modulok importálása
-from utils import load_data
+from utils import load_data_for_training_and_prediction as load_data
 from models import build_simple_cnn, build_advanced_cnn, build_keras_mlp
-from visualize import save_history_plot, save_confusion_matrix_plot
+from visualize import save_history_plot
 
 
 # --- 1. Konfiguráció és Parancssori Argumentumok ---
@@ -38,14 +38,15 @@ def main():
     print("Adatok betöltése...")
     data = load_data()
     if data is None:
-        return  # Hiba történt, a load_data már kiírta
+        return
 
-    (X_train, y_train), (X_val, y_val), (X_test, y_test_cat), num_classes, y_test_labels = data
-    input_shape = X_train.shape[1:]  # Pl. (28, 28, 1)
+    (X_train, y_train), (X_val, y_val), X_test, num_classes, test_filenames = data
+
+    input_shape = X_train.shape[1:]
 
     print(f"Tanító adatok: {X_train.shape}")
     print(f"Validációs adatok: {X_val.shape}")
-    print(f"Teszt adatok: {X_test.shape}")
+    print(f"Predikciós (teszt) adatok: {X_test.shape}")
     print(f"Osztályok száma: {num_classes}")
 
     # --- 3. Modell kiválasztása és építése ---
@@ -60,11 +61,9 @@ def main():
     model.summary()
 
     # --- 4. Callback-ek ---
-    # Korai leállítás: állj meg, ha 5 epoch-on át nem javul a validációs pontosság
     early_stopper = EarlyStopping(monitor='val_accuracy', patience=10,
                                   restore_best_weights=True, verbose=1)
 
-    # Modell mentése: csak a legjobb modellt tartjuk meg
     model_checkpoint_path = os.path.join(RESULTS_DIR, f"{MODEL_NAME}_best.h5")
     model_checkpoint = ModelCheckpoint(model_checkpoint_path, monitor='val_accuracy',
                                        save_best_only=True, verbose=1)
@@ -72,8 +71,8 @@ def main():
     # --- 5. Tanítás ---
     print(f"\n--- Tanítás indítása ({args.epochs} epoch) ---")
 
-    if args.no_augmentation:
-        print("Adatbővítés KIkapcsolva.")
+    if args.no_augmentation or args.model == 'mlp':
+        if args.model != 'mlp': print("Adatbővítés KIkapcsolva.")
         history = model.fit(
             X_train, y_train,
             epochs=args.epochs,
@@ -82,12 +81,10 @@ def main():
             callbacks=[early_stopper, model_checkpoint]
         )
     else:
-        print("Adatbővítés BEkapcsolva (ajánlott).")
+        print("Adatbővítés BEkapcsolva.")
         datagen = ImageDataGenerator(
-            rotation_range=10,
-            width_shift_range=0.1,
-            height_shift_range=0.1,
-            zoom_range=0.1
+            rotation_range=10, width_shift_range=0.1,
+            height_shift_range=0.1, zoom_range=0.1
         )
         datagen.fit(X_train)
 
@@ -101,34 +98,29 @@ def main():
 
     print("--- Tanítás befejezve ---")
 
-    # A legjobb modellt töltsük vissza a kiértékeléshez
     print(f"Legjobb modell betöltése innen: {model_checkpoint_path}")
     model = tf.keras.models.load_model(model_checkpoint_path)
 
-    # --- 6. Kiértékelés a TESZT adatokon ---
-    print("\n--- Végső kiértékelés a TESZT adatokon ---")
-    loss, accuracy = model.evaluate(X_test, y_test_cat)
-    print(f"Teszt hiba (Loss): {loss:.4f}")
-    print(f"Teszt pontosság (Accuracy): {accuracy * 100:.2f}%")
-
-    # Predikciók a riportokhoz
+    # --- 6. PREDIKCIÓ a CÍMKE NÉLKÜLI TESZT adatokon ---
+    print("\n--- Végső predikció indítása a TESZT adatokon ---")
     y_pred_probs = model.predict(X_test)
-    y_pred = np.argmax(y_pred_probs, axis=1)  # Visszaalakítás one-hot-ból
+    y_pred = np.argmax(y_pred_probs, axis=1)  # Visszaalakítás one-hot-ból (pl. 0, 1, 19, stb.)
+    print("Predikciók elkészültek.")
 
     # --- 7. Eredmények mentése ---
     print("Eredmények mentése a 'results/' mappába...")
 
-    # Riport mentése
-    report = classification_report(y_test_labels, y_pred)
-    report_path = os.path.join(RESULTS_DIR, f"{MODEL_NAME}_report.txt")
-    with open(report_path, 'w') as f:
-        f.write(f"Teszt pontosság: {accuracy * 100:.2f}%\n\n")
-        f.write(report)
-    print(f"Osztályozási riport elmentve: {report_path}")
+    # --- BEADÁSI FÁJL LÉTREHOZÁSA ---
+    submission_df = pd.DataFrame({
+        'class': y_pred,
+        'TestImage': test_filenames
+    })
+    submission_path = os.path.join(RESULTS_DIR, f"{MODEL_NAME}_submission.csv")
+    submission_df.to_csv(submission_path, sep=';', index=False)
+    print(f"Beadási fájl (submission) elmentve: {submission_path}")
 
-    # Ábrák mentése
+    # A tanítási görbét elmentjük.
     save_history_plot(history, os.path.join(RESULTS_DIR, f"{MODEL_NAME}_history.png"))
-    save_confusion_matrix_plot(y_test_labels, y_pred, os.path.join(RESULTS_DIR, f"{MODEL_NAME}_cm.png"))
 
     print("\n--- Folyamat befejezve ---")
 
