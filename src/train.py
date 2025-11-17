@@ -5,7 +5,7 @@ from models import build_simple_cnn
 from tensorflow.keras.callbacks import EarlyStopping
 
 # --- Konfiguráció ---
-MODEL_TO_RUN = 'advanced' # Ezt változtasd: 'simple' vagy 'advanced'
+MODEL_TO_RUN = 'simmpe' # Ezt változtasd: 'simple' vagy 'advanced'
 MODEL_NAME = 'cnn_advanced_v1'
 EPOCHS = 100
 BATCH_SIZE = 64
