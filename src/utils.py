@@ -34,18 +34,17 @@ def load_data_for_training_and_prediction():
     num_classes = len(np.unique(y_train_full))
     X_train_full = X_train_full.reshape(-1, IMG_SIZE, IMG_SIZE, 1)
 
-    X_train, X_val, y_train, y_val = train_test_split(
+    X_train, X_val, y_train_labels, y_val_labels = train_test_split(
         X_train_full, y_train_full,
         test_size=0.2,
         random_state=42,
         stratify=y_train_full
     )
-
-    y_train = tf.keras.utils.to_categorical(y_train, num_classes)
-    y_val = tf.keras.utils.to_categorical(y_val, num_classes)
+    y_train_cat = tf.keras.utils.to_categorical(y_train_labels, num_classes)
+    y_val_cat = tf.keras.utils.to_categorical(y_val_labels, num_classes)
 
     # --- Teszt adatok előkészítése ---
     X_test = X_test / 255.0
     X_test = X_test.reshape(-1, IMG_SIZE, IMG_SIZE, 1)
 
-    return (X_train, y_train), (X_val, y_val), X_test, num_classes, test_filenames
+    return (X_train, y_train_cat), (X_val, y_val_cat, y_val_labels), X_test, num_classes, test_filenames

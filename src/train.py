@@ -2,14 +2,14 @@ import os
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 import argparse
 import pandas as pd
 
 # Saját modulok importálása
 from utils import load_data_for_training_and_prediction as load_data
 from models import build_simple_cnn, build_advanced_cnn, build_keras_mlp
-from visualize import save_history_plot
+from visualize import save_history_plot, save_misclassified_plot
 
 
 # --- 1. Konfiguráció és Parancssori Argumentumok ---
@@ -30,7 +30,7 @@ def parse_args():
 def main():
     args = parse_args()
 
-    MODEL_NAME = f"model_{args.model}"
+    MODEL_NAME = f"model_{args.model}_v2"
     RESULTS_DIR = 'results'
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
@@ -40,7 +40,7 @@ def main():
     if data is None:
         return
 
-    (X_train, y_train), (X_val, y_val), X_test, num_classes, test_filenames = data
+    (X_train, y_train), (X_val, y_val, y_val_labels), X_test, num_classes, test_filenames = data
 
     input_shape = X_train.shape[1:]
 
@@ -68,17 +68,31 @@ def main():
     model_checkpoint = ModelCheckpoint(model_checkpoint_path, monitor='val_accuracy',
                                        save_best_only=True, verbose=1)
 
+    # Ha a 'val_loss' 3 epoch-on keresztül nem javul,
+    # csökkenti a tanulási rátát a felére (factor=0.5).
+    reduce_lr = ReduceLROnPlateau(
+        monitor='val_loss',
+        factor=0.5,
+        patience=3,
+        min_lr=0.00001,
+        verbose=1
+    )
+
     # --- 5. Tanítás ---
     print(f"\n--- Tanítás indítása ({args.epochs} epoch) ---")
 
+    callbacks_list = [early_stopper, model_checkpoint, reduce_lr]
+
     if args.no_augmentation or args.model == 'mlp':
-        if args.model != 'mlp': print("Adatbővítés KIkapcsolva.")
+        if args.model != 'mlp':
+            print("Adatbővítés KIkapcsolva.")
+
         history = model.fit(
             X_train, y_train,
             epochs=args.epochs,
             batch_size=args.batch_size,
             validation_data=(X_val, y_val),
-            callbacks=[early_stopper, model_checkpoint]
+            callbacks=callbacks_list
         )
     else:
         print("Adatbővítés BEkapcsolva.")
@@ -92,7 +106,8 @@ def main():
             datagen.flow(X_train, y_train, batch_size=args.batch_size),
             epochs=args.epochs,
             validation_data=(X_val, y_val),
-            callbacks=[early_stopper, model_checkpoint]
+            callbacks=callbacks_list
+
         )
 
     print("--- Tanítás befejezve ---")
@@ -103,7 +118,7 @@ def main():
     # --- 6. PREDIKCIÓ a CÍMKE NÉLKÜLI TESZT adatokon ---
     print("\n--- Végső predikció indítása a TESZT adatokon ---")
     y_pred_probs = model.predict(X_test)
-    y_pred = np.argmax(y_pred_probs, axis=1)  # Visszaalakítás one-hot-ból (pl. 0, 1, 19, stb.)
+    y_pred = np.argmax(y_pred_probs, axis=1)  # Valószínűségekből osztály indexek (pl. 0,1,19 stb.)
     print("Predikciók elkészültek.")
 
     # --- 7. Eredmények mentése ---
@@ -120,6 +135,14 @@ def main():
 
     # A tanítási görbét elmentjük.
     save_history_plot(history, os.path.join(RESULTS_DIR, f"{MODEL_NAME}_history.png"))
+
+    # Hibaelemző ábra mentése
+    save_misclassified_plot(
+        model,
+        X_val,  # A validációs képek
+        y_val_labels,  # Az eredeti, NEM one-hot validációs címkék
+        os.path.join(RESULTS_DIR, f"{MODEL_NAME}_misclassified.png")
+    )
 
     print("\n--- Folyamat befejezve ---")
 
