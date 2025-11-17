@@ -1,38 +1,57 @@
-# Number_And_Character_Recognition_Homework
-This homework was made for a university course on Machine Learning and Deep Learning at BME.
+# Karakterfelismerő CNN Projekt
 
-## Data Setup
+Ez a projekt egy Konvolúciós Neurális Hálót (CNN) tanít be, ami képes felismerni kézzel írott számokat és betűket. A projekt professzionális, skálázható Python csomagstruktúrát használ.
 
-The training and testing data are not included in this repository due to their size.
+## 🚀 Futtatás
 
-1.  **Download the dataset:** You can download the dataset from [this Google Drive link](https://drive.google.com/drive/folders/19SiLQ1_Jx-NcvRF6eY4-kGv3-e-rweyO?usp=drive_link).
-2.  **Unzip the files:** Unzip the downloaded file.
-3.  **Place the data:** Place the `train1` and `test1` folders into the root directory of this project.
+### 1. Telepítés
 
-The final folder structure should look like this:
+A projekt futtatásához szükséges Python könyvtárak:
+```bash
+pip install tensorflow numpy pillow tqdm scikit-learn matplotlib seaborn
 ```
-character-recognition/
-├── data_raw/
-│   ├── train/
-│   │   ├── Sample001/
-│   │   └── ...
-│   └── test/
-│       └── ...
-├── data_processed/
-│   ├── train_features.npy
-│   ├── train_labels.npy
-│   ├── test_features.npy
-│   ├── test_labels.npy
-├── results/
-│   ├── simple_cnn_accuracy.png
-│   ├── advanced_cnn_report.txt
-│   └── advanced_cnn_model.h5
-├── src/
-│   ├── __init__.py
-│   ├── data_preprocessing.py   (A nyers képek átalakítója)
-│   ├── utils.py                (Adatbetöltő és plot-oló segédfüggvények)
-│   ├── models.py               (Itt definiálod az MLP, CNN, stb. modelleket)
-│   └── train.py                (A fő szkript, amit futtatsz)
-└── .gitignore
-└── README.md
+### 2. Adatok Előkészítése
+
+1.  Hozd létre a `data_raw/` mappát a projekt gyökerében.
+2.  Töltsd le a nyers adatokat (pl. a Google Drive linkedről) és másold őket a `data_raw/train` és `data_raw/test` mappákba.
+    A várt struktúra:
+    ```
+    data_raw/
+    ├── train/
+    │   ├── Sample001/ (pl. '0' képei)
+    │   ├── Sample002/ (pl. '1' képei)
+    │   └── ...
+    └── test/
+        ├── Sample001/
+        └── ...
+    ```
+
+3.  Futtasd az adat-előkészítő szkriptet. **Ezt csak egyszer kell megtenni.**
+    ```bash
+    python src/data_preprocessing.py
+    ```
+    Ez létrehozza a `data_processed/` mappát a tiszta `.npy` fájlokkal.
+
+### 3. Modell Tanítása
+
+A fő tanító szkript a `src/train.py`. Parancssori argumentumokkal vezérelheted:
+
+**Alapértelmezett futtatás (fejlett CNN, 50 epoch, adatbővítéssel):**
+```bash
+python src/train.py
 ```
+
+**Kísérletezés (pl. 'simple' modell, 20 epoch, adatbővítés nélkül):**
+```bash
+python src/train.py --model simple --epochs 20 --no_augmentation
+```
+
+**Elérhető argumentumok:**
+* `--model`: Melyik modellt futtassa (`simple`, `advanced`, `mlp`).
+* `--epochs`: Epoch-ok maximális száma.
+* `--batch_size`: Batch méret.
+* `--no_augmentation`: Kikapcsolja a valós idejű adatbővítést.
+
+### 4. Eredmények
+
+A tanítás végén az összes kimenet (modell, ábrák, riport) a `results/` mappába kerül, a modell neve alapján elnevezve (pl. `results/model_advanced_best.h5`).
