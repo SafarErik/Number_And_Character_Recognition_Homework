@@ -92,7 +92,7 @@ def main():
     else:
         print("Adatbővítés BEkapcsolva.")
         datagen = ImageDataGenerator(rotation_range=10, width_shift_range=0.1,
-                                     height_shift_range=0.1, zoom_range=0.1)
+                                     height_shift_range=0.1, zoom_range=0.1, shear_range=0.1)
         datagen.fit(X_train)
         history = model.fit(datagen.flow(X_train, y_train, batch_size=args.batch_size),
                             epochs=args.epochs, validation_data=(X_val, y_val),

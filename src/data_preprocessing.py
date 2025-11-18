@@ -56,7 +56,7 @@ def process_train_images(data_dir):
                 flattened_array = pixel_array.flatten()
 
                 image_data_list.append(flattened_array)
-                label_list.append(current_label)  # A helyes, pl. 45-ös címkét adjuk hozzá
+                label_list.append(current_label)  # pl. 45-ös címkét adjuk hozzá
             except Exception as e:
                 print(f"\nHiba a(z) {image_path} fájl feldolgozása közben: {e}")
 
