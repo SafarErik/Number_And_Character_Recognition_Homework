@@ -3,7 +3,7 @@ import tensorflow as tf
 from sklearn.model_selection import train_test_split
 import os
 
-IMG_SIZE = 28
+IMG_SIZE = 32
 PROCESSED_DATA_DIR = 'data_processed'
 
 

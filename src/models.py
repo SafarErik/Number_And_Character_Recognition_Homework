@@ -69,3 +69,39 @@ def build_keras_mlp(input_shape, num_classes):
 
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
     return model
+
+def build_hybrid_cnn(input_shape, num_classes):
+    """Épít egy fejlettebb Keras CNN-t Batch Norm-mal és több réteggel, és figyel a kis/nagybetűkre"""
+    model = Sequential()
+
+    model.add(Conv2D(32, (5, 5), padding='same', input_shape=input_shape))
+    model.add(BatchNormalization())
+    model.add(Activation('relu'))
+
+    model.add(MaxPooling2D((2, 2)))
+
+    model.add(Conv2D(64, (3, 3), padding='same'))
+    model.add(BatchNormalization())
+    model.add(Activation('relu'))
+
+    model.add(Conv2D(64, (3, 3), padding='same'))
+    model.add(BatchNormalization())
+    model.add(Activation('relu'))
+
+    model.add(MaxPooling2D((2, 2)))
+
+    model.add(Conv2D(128, (3, 3), padding='same'))
+    model.add(BatchNormalization())
+    model.add(Activation('relu'))
+
+    model.add(Flatten())
+
+    model.add(Dense(256))
+    model.add(BatchNormalization())
+    model.add(Activation('relu'))
+    model.add(Dropout(0.5))
+
+    model.add(Dense(num_classes, activation='softmax'))
+
+    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    return model

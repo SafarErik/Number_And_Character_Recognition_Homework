@@ -5,7 +5,7 @@ from tqdm import tqdm
 import json
 
 # --- 1. Konfiguráció ---
-IMG_SIZE = 28
+IMG_SIZE = 32
 TRAIN_DATA_DIR = 'data_raw/train'
 TEST_IMAGE_DIR = 'data_raw/test'
 OUTPUT_DIR = 'data_processed'

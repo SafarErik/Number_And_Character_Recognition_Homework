@@ -10,7 +10,7 @@ import datetime
 
 # Saját modulok importálása
 from utils import load_data_for_training_and_prediction as load_data
-from models import build_simple_cnn, build_advanced_cnn, build_keras_mlp
+from models import build_simple_cnn, build_advanced_cnn, build_keras_mlp, build_hybrid_cnn
 from visualize import save_history_plot, save_misclassified_plot
 
 
@@ -18,7 +18,7 @@ from visualize import save_history_plot, save_misclassified_plot
 def parse_args():
     parser = argparse.ArgumentParser(description='Karakterfelismerő modell tanítása.')
     parser.add_argument('--model', type=str, default='advanced',
-                        choices=['simple', 'advanced', 'mlp'],
+                        choices=['simple', 'advanced', 'mlp', 'hybrid'],
                         help='A használni kívánt modell típusa (default: advanced)')
 
     parser.add_argument('--run_name', type=str, default=None,
@@ -68,6 +68,8 @@ def main():
         model = build_advanced_cnn(input_shape, num_classes)
     elif args.model == 'mlp':
         model = build_keras_mlp(input_shape, num_classes)
+    elif args.model == 'hybrid':
+        model = build_hybrid_cnn(input_shape, num_classes)
     model.summary()
 
     # --- 4. Callback-ek ---

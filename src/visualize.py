@@ -90,7 +90,7 @@ def save_misclassified_plot(model, X_val, y_val_true_labels, file_path, num_imag
 
     for i, idx in enumerate(selected_indices):
         # Kép visszaalakítása 2D-be és 0-255 skálára
-        img = (X_val[idx].reshape(28, 28) * 255).astype(np.uint8)
+        img = (X_val[idx].reshape(32, 32) * 255).astype(np.uint8)
 
         true_label = y_val_true_labels[idx]
         pred_label = y_pred_labels[idx]
