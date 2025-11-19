@@ -2,13 +2,13 @@ import os
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
-import json
 
 # --- 1. Konfiguráció ---
 IMG_SIZE = 32
 TRAIN_DATA_DIR = 'data_raw/train'
 TEST_IMAGE_DIR = 'data_raw/test'
 OUTPUT_DIR = 'data_processed'
+VISUALIZATION_DIR = 'visualization'
 
 
 # --- 2. Függvény a TANÍTÓ adatokhoz (MAPPÁKBÓL) ---
@@ -36,13 +36,10 @@ def process_train_images(data_dir):
 
         # --- Címke kinyerése a mappanévből ---
         try:
-            # Pl. 'Sample019' -> '019' -> 19
-            # Pl. 'Sample045' -> '045' -> 45
             class_id_str = folder_name.replace('Sample', '').lstrip('0')
-            if not class_id_str: class_id_str = '0'  # Pl. 'Sample000' esete
-
+            if not class_id_str:
+                class_id_str = '0'
             current_label = int(class_id_str)
-
         except ValueError:
             print(f"\nFIGYELEM: A '{folder_name}' mappa neve nem 'SampleXXX' formátumú. Kihagyom.")
             continue
@@ -56,7 +53,7 @@ def process_train_images(data_dir):
                 flattened_array = pixel_array.flatten()
 
                 image_data_list.append(flattened_array)
-                label_list.append(current_label)  # pl. 45-ös címkét adjuk hozzá
+                label_list.append(current_label)
             except Exception as e:
                 print(f"\nHiba a(z) {image_path} fájl feldolgozása közben: {e}")
 
@@ -98,7 +95,48 @@ def process_test_images_no_labels(image_dir):
     return features_X, filenames
 
 
-# --- 4. Fő futtatható rész ---
+# --- 4. Vizualizáció létrehozása ---
+def create_visualization_sample(train_dir, output_vis_dir, target_folder='Sample001'):
+    sample_folder = os.path.join(train_dir, target_folder)
+    if not os.path.isdir(sample_folder):
+        print(f"FIGYELEM: A '{target_folder}' mappa nem található, vizualizáció kihagyva.")
+        return
+    image_files = sorted([
+        f for f in os.listdir(sample_folder)
+        if f.lower().endswith(('.png', '.jpg', '.jpeg'))
+    ])
+    if not image_files:
+        print(f"FIGYELEM: Nincs képfájl a '{target_folder}' mappában, vizualizáció kihagyva.")
+        return
+
+    first_image_name = image_files[0]
+    img_path = os.path.join(sample_folder, first_image_name)
+
+    os.makedirs(output_vis_dir, exist_ok=True)
+    # Tisztítás: mindig csak 2 fájl legyen
+    for f in os.listdir(output_vis_dir):
+        try:
+            os.remove(os.path.join(output_vis_dir, f))
+        except Exception:
+            pass
+
+    try:
+        original_img = Image.open(img_path)
+        original_save_path = os.path.join(output_vis_dir, 'original.png')
+        original_img.save(original_save_path)
+
+        processed_img = original_img.convert('L').resize((IMG_SIZE, IMG_SIZE))
+        arr = np.array(processed_img).astype(np.float32) / 255.0  # Normalizálás 0-1
+        arr_to_save = (arr * 255).astype(np.uint8)
+        processed_save_path = os.path.join(output_vis_dir, 'processed_32x32.png')
+        Image.fromarray(arr_to_save).save(processed_save_path)
+
+        print(f"Vizualizáció mentve: {original_save_path}, {processed_save_path}")
+    except Exception as e:
+        print(f"HIBA a vizualizáció létrehozásakor: {e}")
+
+
+# --- 5. Fő futtatható rész ---
 if __name__ == "__main__":
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -125,5 +163,9 @@ if __name__ == "__main__":
         print(f"A teszt képpontok elmentve: {X_test.shape}")
     else:
         print("HIBA: A teszt adatok feldolgozása sikertelen.")
+
+    # --- Vizualizáció (Sample001 első kép) ---
+    print("\n--- Vizualizáció létrehozása ---")
+    create_visualization_sample(TRAIN_DATA_DIR, VISUALIZATION_DIR, target_folder='Sample001')
 
     print("\nAdat-előkészítés befejezve!")
