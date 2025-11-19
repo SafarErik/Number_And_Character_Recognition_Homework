@@ -73,9 +73,17 @@ def main():
     # --- 2. Adatok betöltése ---
     print("Adatok betöltése...")
     data = load_data()
-    if data is None: return
+    if data is None:
+        return
 
-    (X_train, y_train), (X_val, y_val, y_val_labels), X_test, num_classes, test_filenames = data
+    X_train, X_val, y_train_labels, y_val_labels, X_test, test_filenames, num_classes = data
+
+    # One-hot encoding itt történik
+    y_train = tf.keras.utils.to_categorical(y_train_labels, num_classes)
+    y_val = tf.keras.utils.to_categorical(y_val_labels, num_classes)
+
+    print(f"Tanító adat: {X_train.shape}, Validációs adat: {X_val.shape}")
+
     input_shape = X_train.shape[1:]
 
     # --- 3. Modell építése ---
