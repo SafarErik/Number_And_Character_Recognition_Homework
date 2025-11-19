@@ -8,9 +8,8 @@ import argparse
 import pandas as pd
 import datetime
 
-# Saját modulok importálása
 from utils import load_data_for_training_and_prediction as load_data
-from models import build_simple_cnn, build_advanced_cnn, build_keras_mlp, build_hybrid_cnn
+from models import build_simple_cnn, build_advanced_cnn, build_keras_mlp, build_hybrid_cnn, build_pro_hybrid_cnn, build_regularized_hybrid_cnn
 from visualize import save_history_plot, save_misclassified_plot
 
 
@@ -18,7 +17,7 @@ from visualize import save_history_plot, save_misclassified_plot
 def parse_args():
     parser = argparse.ArgumentParser(description='Karakterfelismerő modell tanítása.')
     parser.add_argument('--model', type=str, default='advanced',
-                        choices=['simple', 'advanced', 'mlp', 'hybrid'],
+                        choices=['simple', 'advanced', 'mlp', 'hybrid', 'pro_hybrid', 'regularized'],
                         help='A használni kívánt modell típusa (default: advanced)')
 
     parser.add_argument('--run_name', type=str, default=None,
@@ -70,6 +69,10 @@ def main():
         model = build_keras_mlp(input_shape, num_classes)
     elif args.model == 'hybrid':
         model = build_hybrid_cnn(input_shape, num_classes)
+    elif args.model == 'pro_hybrid':
+        model = build_pro_hybrid_cnn(input_shape, num_classes)
+    elif args.model == 'regularized':
+        model = build_regularized_hybrid_cnn(input_shape, num_classes)
     model.summary()
 
     # --- 4. Callback-ek ---
@@ -93,9 +96,25 @@ def main():
                             validation_data=(X_val, y_val), callbacks=callbacks_list)
     else:
         print("Adatbővítés BEkapcsolva.")
-        datagen = ImageDataGenerator(rotation_range=10, width_shift_range=0.1,
-                                     height_shift_range=0.1, zoom_range=0.1, shear_range=0.1)
+
+        # Alapértelmezett beállítások (pl. a Hybrid modellhez)
+        aug_config = {
+            'rotation_range': 15,
+            'width_shift_range': 0.15,
+            'height_shift_range': 0.15,
+            'zoom_range': 0.05,
+            'shear_range': 0.2
+        }
+
+        # Ha a 'size_expert' futtatást érzékeljük a névből, kapcsoljuk ki a zoomot!
+        if "size_expert" in RUN_NAME:
+            print(">> SPECIÁLIS MÓD: Size Expert (Zoom kikapcsolva!)")
+            aug_config['zoom_range'] = 0.0
+            aug_config['height_shift_range'] = 0.05  # Kevesebb függőleges mozgás is segít
+
+        datagen = ImageDataGenerator(**aug_config)  # A ** kicsomagolja a szótárat
         datagen.fit(X_train)
+
         history = model.fit(datagen.flow(X_train, y_train, batch_size=args.batch_size),
                             epochs=args.epochs, validation_data=(X_val, y_val),
                             callbacks=callbacks_list)
