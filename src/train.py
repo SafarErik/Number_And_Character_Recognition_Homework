@@ -168,11 +168,10 @@ def main():
         report = classification_report(y_val_labels, val_pred)
         with open(report_path, 'w') as f:
             f.write(report)
-            f.write(f"\n\n--- Tanítási statisztikák ---\n")
-            f.write(f"Összes tanítási idő: {format_time(total_training_time)} ({total_training_time:.2f} másodperc)\n")
-            f.write(
-                f"Átlagos idő epochonként: {format_time(avg_time_per_epoch)} ({avg_time_per_epoch:.2f} másodperc)\n")
-            f.write(f"Epoch-ok száma: {actual_epochs}\n")
+            f.write(f"\n\n--- Learning statistics ---\n")
+            f.write(f"Total training time: {format_time(total_training_time)} ({total_training_time:.2f} seconds)\n")
+            f.write(f"Average time per epoch: {format_time(avg_time_per_epoch)} ({avg_time_per_epoch:.2f} seconds)\n")
+            f.write(f"Number of epochs: {actual_epochs}\n")
         print(f"Validációs riport elmentve: {report_path}")
     except Exception as e:
         print(f"Validációs riport mentése sikertelen: {e}")
