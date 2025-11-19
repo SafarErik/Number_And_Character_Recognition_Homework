@@ -7,6 +7,7 @@ from sklearn.metrics import classification_report
 import argparse
 import pandas as pd
 import datetime
+import time
 
 from utils import load_data_for_training_and_prediction as load_data
 from models import build_simple_cnn, build_advanced_cnn, build_keras_mlp, build_hybrid_cnn, build_pro_hybrid_cnn, build_regularized_hybrid_cnn
@@ -32,6 +33,14 @@ def parse_args():
     return parser.parse_args()
 
 
+def format_time(seconds):
+    """Időt formáz óra:perc:másodperc formátumba"""
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+
 def main():
     args = parse_args()
 
@@ -40,7 +49,6 @@ def main():
     if args.run_name:
         RUN_NAME = args.run_name
     else:
-        # Ha nem adtál meg nevet, generál egyet, pl. "advanced_20251117_214500"
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         RUN_NAME = f"{args.model}_{timestamp}"
 
@@ -50,7 +58,6 @@ def main():
     print(f"\n--- ÚJ FUTTATÁS INDUL ---")
     print(f"Kísérlet neve: {RUN_NAME}")
     print(f"Minden eredmény ide lesz mentve: {RUN_RESULTS_DIR}")
-
 
     # --- 2. Adatok betöltése ---
     print("Adatok betöltése...")
@@ -79,7 +86,6 @@ def main():
     early_stopper = EarlyStopping(monitor='val_accuracy', patience=10,
                                   restore_best_weights=True, verbose=1)
 
-    # A mentési útvonal egy alkönyvtárba mutat
     model_checkpoint_path = os.path.join(RUN_RESULTS_DIR, "best_model.keras")
     model_checkpoint = ModelCheckpoint(model_checkpoint_path, monitor='val_accuracy',
                                        save_best_only=True, verbose=1)
@@ -89,8 +95,10 @@ def main():
 
     callbacks_list = [early_stopper, model_checkpoint, reduce_lr]
 
-    # --- 5. Tanítás ---
+    # --- 5. Tanítás időméréssel ---
     print(f"\n--- Tanítás indítása ({args.epochs} epoch) ---")
+    training_start_time = time.time()
+
     if args.no_augmentation or args.model == 'mlp':
         history = model.fit(X_train, y_train, epochs=args.epochs, batch_size=args.batch_size,
                             validation_data=(X_val, y_val), callbacks=callbacks_list)
@@ -119,7 +127,15 @@ def main():
                             epochs=args.epochs, validation_data=(X_val, y_val),
                             callbacks=callbacks_list)
 
-    print("--- Tanítás befejezve ---")
+    training_end_time = time.time()
+    total_training_time = training_end_time - training_start_time
+    actual_epochs = len(history.history['loss'])
+    avg_time_per_epoch = total_training_time / actual_epochs
+
+    print("\n--- Tanítás befejezve ---")
+    print(f"Összes tanítási idő: {format_time(total_training_time)} ({total_training_time:.2f} másodperc)")
+    print(f"Átlagos idő epochonként: {format_time(avg_time_per_epoch)} ({avg_time_per_epoch:.2f} másodperc)")
+    print(f"Tényleges epoch-ok száma: {actual_epochs}")
 
     print(f"Legjobb modell betöltése innen: {model_checkpoint_path}")
     model = tf.keras.models.load_model(model_checkpoint_path)
@@ -130,7 +146,7 @@ def main():
     y_pred = np.argmax(y_pred_probs, axis=1)
     print("Predikciók elkészültek.")
 
-    # --- 7. Eredmények mentése (alkönyvtárba) ---
+    # --- 7. Eredmények mentése ---
     print(f"Eredmények mentése a '{RUN_RESULTS_DIR}' mappába...")
 
     # Beadási fájl
@@ -152,6 +168,11 @@ def main():
         report = classification_report(y_val_labels, val_pred)
         with open(report_path, 'w') as f:
             f.write(report)
+            f.write(f"\n\n--- Tanítási statisztikák ---\n")
+            f.write(f"Összes tanítási idő: {format_time(total_training_time)} ({total_training_time:.2f} másodperc)\n")
+            f.write(
+                f"Átlagos idő epochonként: {format_time(avg_time_per_epoch)} ({avg_time_per_epoch:.2f} másodperc)\n")
+            f.write(f"Epoch-ok száma: {actual_epochs}\n")
         print(f"Validációs riport elmentve: {report_path}")
     except Exception as e:
         print(f"Validációs riport mentése sikertelen: {e}")
