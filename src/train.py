@@ -10,7 +10,8 @@ import datetime
 import time
 
 from utils import load_data_for_training_and_prediction as load_data
-from models import build_simple_cnn, build_advanced_cnn, build_keras_mlp, build_hybrid_cnn, build_pro_hybrid_cnn, build_regularized_hybrid_cnn
+from models import (build_simple_cnn, build_advanced_cnn, build_keras_mlp, build_hybrid_cnn,
+                    build_pro_hybrid_cnn, build_regularized_hybrid_cnn, build_optimized_ocr_model)
 from visualize import save_history_plot, save_misclassified_plot
 
 
@@ -18,7 +19,7 @@ from visualize import save_history_plot, save_misclassified_plot
 def parse_args():
     parser = argparse.ArgumentParser(description='Karakterfelismerő modell tanítása.')
     parser.add_argument('--model', type=str, default='advanced',
-                        choices=['simple', 'advanced', 'mlp', 'hybrid', 'pro_hybrid', 'regularized'],
+                        choices=['simple', 'advanced', 'mlp', 'hybrid', 'pro_hybrid', 'regularized', 'optimized'],
                         help='A használni kívánt modell típusa (default: advanced)')
 
     parser.add_argument('--run_name', type=str, default=None,
@@ -44,6 +45,16 @@ def format_time(seconds):
 def main():
     args = parse_args()
 
+    # GPU ellenőrzés és memória growth beállítása
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    if gpus:
+        try:
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+            print(f"GPU(k) észlelve: {len(gpus)} db")
+        except RuntimeError as e:
+            print(f"GPU konfiguráció hiba: {e}")
+
     BASE_RESULTS_DIR = 'results'
 
     if args.run_name:
@@ -68,6 +79,7 @@ def main():
     input_shape = X_train.shape[1:]
 
     # --- 3. Modell építése ---
+    print(f"\n--- Modell építése: {args.model} ---")
     if args.model == 'simple':
         model = build_simple_cnn(input_shape, num_classes)
     elif args.model == 'advanced':
@@ -80,10 +92,19 @@ def main():
         model = build_pro_hybrid_cnn(input_shape, num_classes)
     elif args.model == 'regularized':
         model = build_regularized_hybrid_cnn(input_shape, num_classes)
+    elif args.model == 'optimized':
+        print(">>> OPTIMALIZÁLT MODELL (Swish + Focal Loss) indítása... <<<")
+        model = build_optimized_ocr_model(input_shape, num_classes)
+    else:
+        print(f"HIBA: Ismeretlen modell típus: {args.model}")
+        return
     model.summary()
 
     # --- 4. Callback-ek ---
-    early_stopper = EarlyStopping(monitor='val_accuracy', patience=10,
+    # Türelem növelése az optimalizált modellnél (Focal Loss kicsit hullámzik)
+    patience = 12 if args.model == 'optimized' else 10
+
+    early_stopper = EarlyStopping(monitor='val_accuracy', patience=patience,
                                   restore_best_weights=True, verbose=1)
 
     model_checkpoint_path = os.path.join(RUN_RESULTS_DIR, "best_model.keras")
@@ -91,7 +112,8 @@ def main():
                                        save_best_only=True, verbose=1)
 
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5,
-                                  patience=3, min_lr=0.00001, verbose=1)
+                                  patience=4 if args.model == 'optimized' else 3,
+                                  min_lr=0.000001, verbose=1)
 
     callbacks_list = [early_stopper, model_checkpoint, reduce_lr]
 
@@ -111,11 +133,25 @@ def main():
             'width_shift_range': 0.15,
             'height_shift_range': 0.15,
             'zoom_range': 0.05,
-            'shear_range': 0.2
+            'shear_range': 0.2,
+            'horizontal_flip': False,  # TILTOTT betűknél
+            'fill_mode': 'nearest'
         }
 
+        # Optimalizált modellhez speciális augmentáció (zoom kikapcsolva!)
+        if args.model == 'optimized':
+            print(">> SPECIÁLIS AUGMENTÁCIÓ: Optimized Model (Zoom TILTVA w/W megkülönböztetésért!)")
+            aug_config = {
+                'rotation_range': 8,        # Csak pici forgatás
+                'width_shift_range': 0.08,  # Pici elmozdulás
+                'height_shift_range': 0.08,
+                'shear_range': 0.05,
+                'zoom_range': 0.0,          # TILTOTT a w/W miatt!
+                'horizontal_flip': False,   # TILTOTT betűknél
+                'fill_mode': 'nearest'
+            }
         # Ha a 'size_expert' futtatást érzékeljük a névből, kapcsoljuk ki a zoomot!
-        if "size_expert" in RUN_NAME:
+        elif "size_expert" in RUN_NAME:
             print(">> SPECIÁLIS MÓD: Size Expert (Zoom kikapcsolva!)")
             aug_config['zoom_range'] = 0.0
             aug_config['height_shift_range'] = 0.05  # Kevesebb függőleges mozgás is segít
