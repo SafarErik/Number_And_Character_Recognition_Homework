@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from PIL import Image
+import cv2  # OpenCV szükséges a paddingoláshoz (pip install opencv-python)
 from tqdm import tqdm
 
 # --- 1. Konfiguráció ---
@@ -11,7 +12,51 @@ OUTPUT_DIR = 'data_processed'
 VISUALIZATION_DIR = 'visualization'
 
 
-# --- 2. Függvény a TANÍTÓ adatokhoz (MAPPÁKBÓL) ---
+# --- 2. Képarány-megőrző átméretezés paddingolással ---
+def preprocess_image_aspect_ratio(image_path, target_size=IMG_SIZE):
+    """
+    Képarány-megőrző átméretezés (paddinggal).
+    Ez kritikus a '0' vs 'o' és 'w' vs 'W' megkülönböztetéséhez.
+    Nem nyújtja meg a karaktert, hanem fekete keretet tesz köré.
+    """
+    try:
+        # Kép betöltése szürkeárnyalatosként
+        img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+        if img is None:
+            return None
+
+        # Ha a kép világos (fehér) hátterű, invertáljuk (fekete háttér, fehér betű kell)
+        # Ez egyszerű heurisztika: ha az átlag pixelérték magas, akkor valszeg fehér a háttér.
+        if np.mean(img) > 127:
+            img = 255 - img
+
+        # Eredeti méretek
+        old_size = img.shape[:2] # (height, width)
+
+        # Kiszámoljuk az arányt, hogy beleférjen a dobozba
+        ratio = float(target_size) / max(old_size)
+        new_size = tuple([int(x * ratio) for x in old_size]) # (new_height, new_width)
+
+        # Átméretezés (INTER_AREA jobb kicsinyítéshez)
+        img = cv2.resize(img, (new_size[1], new_size[0]), interpolation=cv2.INTER_AREA)
+
+        # Kiszámoljuk mennyi keret kell
+        delta_w = target_size - new_size[1]
+        delta_h = target_size - new_size[0]
+        top, bottom = delta_h // 2, delta_h - (delta_h // 2)
+        left, right = delta_w // 2, delta_w - (delta_w // 2)
+
+        # Fekete keret hozzáadása (Border)
+        new_img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=0)
+
+        return new_img
+
+    except Exception as e:
+        print(f"\nHiba a kép feldolgozásakor ({image_path}): {e}")
+        return None
+
+
+# --- 3. Függvény a TANÍTÓ adatokhoz (MAPPÁKBÓL) ---
 def process_train_images(data_dir):
     image_data_list = []
     label_list = []
@@ -44,33 +89,37 @@ def process_train_images(data_dir):
             print(f"\nFIGYELEM: A '{folder_name}' mappa neve nem 'SampleXXX' formátumú. Kihagyom.")
             continue
 
-        for image_name in sorted(os.listdir(folder_path)):
+        image_files = [f for f in os.listdir(folder_path) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp'))]
+
+        for image_name in image_files:
             image_path = os.path.join(folder_path, image_name)
-            try:
-                img = Image.open(image_path).convert('L')
-                img = img.resize((IMG_SIZE, IMG_SIZE))
-                pixel_array = np.array(img)
-                flattened_array = pixel_array.flatten()
 
-                image_data_list.append(flattened_array)
+            # Új paddingos feldolgozás
+            processed_img = preprocess_image_aspect_ratio(image_path, IMG_SIZE)
+
+            if processed_img is not None:
+                image_data_list.append(processed_img)
                 label_list.append(current_label)
-            except Exception as e:
-                print(f"\nHiba a(z) {image_path} fájl feldolgozása közben: {e}")
 
-    features_X = np.array(image_data_list)
+    if not image_data_list:
+        print("Nem sikerült képeket betölteni.")
+        return None, None
+
+    # 4D tömb létrehozása (samples, height, width, channels) - CNN-ekhez
+    features_X = np.array(image_data_list).reshape(-1, IMG_SIZE, IMG_SIZE, 1)
     labels_y = np.array(label_list)
 
     return features_X, labels_y
 
 
-# --- 3. Függvény a CÍMKE NÉLKÜLI TESZT adatokhoz ---
+# --- 4. Függvény a CÍMKE NÉLKÜLI TESZT adatokhoz ---
 def process_test_images_no_labels(image_dir):
     image_data_list = []
     filename_list = []
     try:
         image_filenames = sorted([
             f for f in os.listdir(image_dir)
-            if f.lower().endswith(('.png', '.jpg', '.jpeg'))
+            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp'))
         ])
     except FileNotFoundError:
         print(f"HIBA: A '{image_dir}' teszt mappa nem található!")
@@ -81,21 +130,25 @@ def process_test_images_no_labels(image_dir):
     print(f"Címke nélküli teszt képek feldolgozása a(z) '{image_dir}' mappából...")
     for image_name in tqdm(image_filenames, desc="Teszt képek"):
         image_path = os.path.join(image_dir, image_name)
-        try:
-            img = Image.open(image_path).convert('L')
-            img = img.resize((IMG_SIZE, IMG_SIZE))
-            pixel_array = np.array(img)
-            flattened_array = pixel_array.flatten()
-            image_data_list.append(flattened_array)
+
+        # Új paddingos feldolgozás
+        processed_img = preprocess_image_aspect_ratio(image_path, IMG_SIZE)
+
+        if processed_img is not None:
+            image_data_list.append(processed_img)
             filename_list.append(image_name)
-        except Exception as e:
-            print(f"\nHiba a(z) {image_path} fájl feldolgozása közben: {e}")
-    features_X = np.array(image_data_list)
+
+    if not image_data_list:
+        print("Nem sikerült képeket betölteni.")
+        return None, None
+
+    # 4D tömb létrehozása (samples, height, width, channels) - CNN-ekhez
+    features_X = np.array(image_data_list).reshape(-1, IMG_SIZE, IMG_SIZE, 1)
     filenames = np.array(filename_list)
     return features_X, filenames
 
 
-# --- 4. Vizualizáció létrehozása ---
+# --- 5. Vizualizáció létrehozása ---
 def create_visualization_sample(train_dir, output_vis_dir, target_folder='Sample001'):
     sample_folder = os.path.join(train_dir, target_folder)
     if not os.path.isdir(sample_folder):
@@ -103,7 +156,7 @@ def create_visualization_sample(train_dir, output_vis_dir, target_folder='Sample
         return
     image_files = sorted([
         f for f in os.listdir(sample_folder)
-        if f.lower().endswith(('.png', '.jpg', '.jpeg'))
+        if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp'))
     ])
     if not image_files:
         print(f"FIGYELEM: Nincs képfájl a '{target_folder}' mappában, vizualizáció kihagyva.")
@@ -121,17 +174,19 @@ def create_visualization_sample(train_dir, output_vis_dir, target_folder='Sample
             pass
 
     try:
+        # Eredeti kép mentése (PIL-lel)
         original_img = Image.open(img_path)
         original_save_path = os.path.join(output_vis_dir, 'original.png')
         original_img.save(original_save_path)
 
-        processed_img = original_img.convert('L').resize((IMG_SIZE, IMG_SIZE))
-        arr = np.array(processed_img).astype(np.float32) / 255.0  # Normalizálás 0-1
-        arr_to_save = (arr * 255).astype(np.uint8)
-        processed_save_path = os.path.join(output_vis_dir, 'processed_32x32.png')
-        Image.fromarray(arr_to_save).save(processed_save_path)
-
-        print(f"Vizualizáció mentve: {original_save_path}, {processed_save_path}")
+        # Feldolgozott kép mentése (új módszerrel)
+        processed_img = preprocess_image_aspect_ratio(img_path, IMG_SIZE)
+        if processed_img is not None:
+            processed_save_path = os.path.join(output_vis_dir, 'processed_32x32.png')
+            cv2.imwrite(processed_save_path, processed_img)
+            print(f"Vizualizáció mentve: {original_save_path}, {processed_save_path}")
+        else:
+            print("HIBA: Nem sikerült feldolgozni a képet a vizualizációhoz")
     except Exception as e:
         print(f"HIBA a vizualizáció létrehozásakor: {e}")
 
