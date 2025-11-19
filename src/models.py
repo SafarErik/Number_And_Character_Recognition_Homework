@@ -1,11 +1,31 @@
 import tensorflow as tf
-from keras.src.layers import GlobalAveragePooling2D
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import (
-    Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization, Activation
+    Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization, Activation, Input
 )
-
 from tensorflow.keras import regularizers
+from tensorflow.keras import backend as K
+
+
+# --- FOCAL LOSS ---
+# Ez segít az o vs 0 és hasonló nehéz esetekben.
+# Nem foglalkozik azokkal a betűkkel, amiket már tud (pl. 'A'),
+# hanem a hibásan osztályozottakra koncentrál.
+def categorical_focal_loss(gamma=2.0, alpha=0.25):
+    """
+    Focal Loss a nehéz példányok (pl. 'o' vs '0') kezelésére.
+
+    Args:
+        gamma: Fókuszálás paramétere (magasabb = jobban koncentrál a nehéz esetekre)
+        alpha: Súlyozási faktor
+    """
+    def focal_loss_fixed(y_true, y_pred):
+        epsilon = K.epsilon()
+        y_pred = K.clip(y_pred, epsilon, 1. - epsilon)
+        cross_entropy = -y_true * K.log(y_pred)
+        loss = alpha * K.pow(1 - y_pred, gamma) * cross_entropy
+        return K.mean(K.sum(loss, axis=-1))
+    return focal_loss_fixed
 
 
 def build_simple_cnn(input_shape, num_classes):
@@ -164,6 +184,81 @@ def build_pro_hybrid_cnn(input_shape, num_classes):
     loss_fn = tf.keras.losses.CategoricalCrossentropy(label_smoothing=0.1)
 
     model.compile(optimizer='adam', loss=loss_fn, metrics=['accuracy'])
+    return model
+
+
+def build_optimized_ocr_model(input_shape, num_classes):
+    """
+    Gyors tanulásra és magas pontosságra hangolt modell.
+    - L2 helyett BatchNormalization (gyorsabb)
+    - ReLU helyett Swish (finomabb részletek)
+    - Focal Loss (nehéz karakterek kezelése: 'o' vs '0', 'w' vs 'W', stb.)
+    - Flatten a GlobalAveragePooling helyett (megőrzi a térbeli információt)
+    """
+    model = Sequential(name="Optimized_Swish_Net")
+
+    # 1. Blokk
+    model.add(Input(shape=input_shape))
+    model.add(Conv2D(32, (3, 3), padding='same', use_bias=False))
+    model.add(BatchNormalization()) # BN gyorsítja a tanulást
+    model.add(Activation('swish'))  # Swish jobb mint a ReLU mély hálóknál
+
+    model.add(Conv2D(32, (3, 3), padding='same', use_bias=False))
+    model.add(BatchNormalization())
+    model.add(Activation('swish'))
+
+    model.add(MaxPooling2D((2, 2)))
+    model.add(Dropout(0.1))
+
+    # 2. Blokk
+    model.add(Conv2D(64, (3, 3), padding='same', use_bias=False))
+    model.add(BatchNormalization())
+    model.add(Activation('swish'))
+
+    model.add(Conv2D(64, (3, 3), padding='same', use_bias=False))
+    model.add(BatchNormalization())
+    model.add(Activation('swish'))
+
+    model.add(MaxPooling2D((2, 2)))
+    model.add(Dropout(0.1))
+
+    # 3. Blokk
+    model.add(Conv2D(128, (3, 3), padding='same', use_bias=False))
+    model.add(BatchNormalization())
+    model.add(Activation('swish'))
+
+    model.add(Conv2D(128, (3, 3), padding='same', use_bias=False))
+    model.add(BatchNormalization())
+    model.add(Activation('swish'))
+
+    model.add(MaxPooling2D((2, 2)))
+    model.add(Dropout(0.2))
+
+    # 4. Blokk (Feature extractor vége)
+    model.add(Conv2D(256, (3, 3), padding='same', use_bias=False))
+    model.add(BatchNormalization())
+    model.add(Activation('swish'))
+    # Itt nincs Pooling, hogy megmaradjon a térbeli infó (pl. 'P' hasa hol van)
+
+    # Osztályozó
+    model.add(Flatten()) # Flatten kell a pontossághoz (GlobalAveragePooling túl sokat tömörít)
+
+    model.add(Dense(512, use_bias=False))
+    model.add(BatchNormalization())
+    model.add(Activation('swish'))
+    model.add(Dropout(0.4)) # Erős dropout a túltanulás ellen
+
+    model.add(Dense(num_classes, activation='softmax'))
+
+    # Fordítás Focal Loss-szal
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+
+    model.compile(
+        optimizer=optimizer,
+        loss=categorical_focal_loss(gamma=2.0, alpha=0.25),
+        metrics=['accuracy']
+    )
+
     return model
 
 
