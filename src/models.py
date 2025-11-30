@@ -117,11 +117,11 @@ def build_hybrid_cnn(input_shape, num_classes):
 
 def build_pro_hybrid_cnn(input_shape, num_classes):
     """
-    A Hybrid modell felturbózva: Swish aktiváció, GAP és Label Smoothing.
+    A Hybrid modell felturbózva: Swish aktiváció és Label Smoothing.
     """
     model = Sequential()
 
-    # --- 1. BLOKK (Swish-sel) ---
+    # --- 1. BLOKK ---
     model.add(Conv2D(32, (5, 5), padding='same', input_shape=input_shape, kernel_initializer='he_normal'))
     model.add(BatchNormalization())
     model.add(Activation('swish'))
@@ -152,12 +152,13 @@ def build_pro_hybrid_cnn(input_shape, num_classes):
     model.add(BatchNormalization())
     model.add(Activation('swish'))
 
-    model.add(Flatten())
+    model.add(GlobalAveragePooling2D())
 
     model.add(Dense(256, kernel_initializer='he_normal'))
     model.add(BatchNormalization())
     model.add(Activation('swish'))
     model.add(Dropout(0.5))
+
     model.add(Dense(num_classes, activation='softmax'))
 
 
@@ -229,6 +230,7 @@ def build_regularized_hybrid_cnn(input_shape, num_classes):
 
     # Label smoothing
     loss_fn = tf.keras.losses.CategoricalCrossentropy(label_smoothing=0.1)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.0005, clipnorm=1.0)
 
-    model.compile(optimizer='adam', loss=loss_fn, metrics=['accuracy'])
+    model.compile(optimizer=optimizer, loss=loss_fn, metrics=['accuracy'])
     return model

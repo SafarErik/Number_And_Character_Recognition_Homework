@@ -36,7 +36,7 @@ def load_data_for_training_and_prediction():
         random_state=42,
         stratify=y_train_full
     )
-
+    # One-hot kódolás
     y_train_cat = tf.keras.utils.to_categorical(y_train_labels, num_classes)
     y_val_cat = tf.keras.utils.to_categorical(y_val_labels, num_classes)
 

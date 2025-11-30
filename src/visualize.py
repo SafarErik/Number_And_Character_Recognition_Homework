@@ -59,13 +59,6 @@ def save_misclassified_plot(model, X_val, y_val_true_labels, file_path, num_imag
     """
     Kiválaszt véletlenszerűen elrontott képeket a validációs halmazból
     és elmenti őket egy ábrára.
-
-    Args:
-        model: A betanított Keras modell.
-        X_val: A validációs képadatok (normalizálva, 4D formátumban).
-        y_val_true_labels: A validációs címkék (NEM one-hot, sima számok, pl. 19, 45).
-        file_path: A mentés helye.
-        num_images: Hány képet mutasson.
     """
     print("Elrontott jóslatok keresése a validációs adatokon...")
     # Jóslatok készítése a validációs adatokra

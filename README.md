@@ -12,8 +12,6 @@ A projekt futtatásához szükséges Python könyvtárak:
 pip install tensorflow numpy pillow tqdm scikit-learn matplotlib seaborn pandas
 ```
 
-*(Érdemes ezeket egy `requirements.txt` fájlba is beírni.)*
-
 -----
 
 ### 2\. Adatok Előkészítése

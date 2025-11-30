@@ -10,7 +10,7 @@ import datetime
 
 from utils import load_data_for_training_and_prediction as load_data
 from models import build_simple_cnn, build_advanced_cnn, build_keras_mlp, build_hybrid_cnn, build_pro_hybrid_cnn, build_regularized_hybrid_cnn
-from visualize import save_history_plot, save_misclassified_plot
+from visualize import save_history_plot, save_misclassified_plot, save_confusion_matrix_plot
 
 
 # --- 1. Konfiguráció ---
@@ -99,18 +99,18 @@ def main():
 
         # Alapértelmezett beállítások (pl. a Hybrid modellhez)
         aug_config = {
-            'rotation_range': 15,
-            'width_shift_range': 0.15,
-            'height_shift_range': 0.15,
-            'zoom_range': 0.05,
-            'shear_range': 0.2
+            'rotation_range': 20,
+            'width_shift_range': 0.1,
+            'height_shift_range': 0.1,
+            'zoom_range': 0.2,
+            'shear_range': 0.1
         }
 
         # Ha a 'size_expert' futtatást érzékeljük a névből, kapcsoljuk ki a zoomot!
         if "size_expert" in RUN_NAME:
             print(">> SPECIÁLIS MÓD: Size Expert (Zoom kikapcsolva!)")
             aug_config['zoom_range'] = 0.0
-            aug_config['height_shift_range'] = 0.05  # Kevesebb függőleges mozgás is segít
+            aug_config['height_shift_range'] = 0.05  # Kevesebb függőleges mozgás is lehet jót tesz neki
 
         datagen = ImageDataGenerator(**aug_config)  # A ** kicsomagolja a szótárat
         datagen.fit(X_train)
@@ -144,17 +144,25 @@ def main():
     save_misclassified_plot(model, X_val, y_val_labels,
                             os.path.join(RUN_RESULTS_DIR, "misclassified.png"))
 
-    # Riport (validációs adatokon)
-    report_path = os.path.join(RUN_RESULTS_DIR, "validation_report.txt")
+    print("Validációs riport és mátrix készítése...")
     try:
-        val_pred_probs = model.predict(X_val)
-        val_pred = np.argmax(val_pred_probs, axis=1)
+        # Először jósolunk a validációs adatokra
+        val_pred_probs = model.predict(X_val, verbose=0)
+        val_pred = np.argmax(val_pred_probs, axis=1)  # Ezek az indexek (0-62)
+
+        # Riport mentése
         report = classification_report(y_val_labels, val_pred)
+        report_path = os.path.join(RUN_RESULTS_DIR, "validation_report.txt")
         with open(report_path, 'w') as f:
             f.write(report)
         print(f"Validációs riport elmentve: {report_path}")
+
+        # Konfúziós Mátrix Mentése
+        cm_path = os.path.join(RUN_RESULTS_DIR, "confusion_matrix.png")
+        save_confusion_matrix_plot(y_val_labels, val_pred, cm_path)
+
     except Exception as e:
-        print(f"Validációs riport mentése sikertelen: {e}")
+        print(f"Validációs kiértékelés sikertelen: {e}")
 
     print("\n--- Folyamat befejezve ---")
 
