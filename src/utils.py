@@ -3,7 +3,7 @@ import tensorflow as tf
 from sklearn.model_selection import train_test_split
 import os
 
-IMG_SIZE = 32
+IMG_SIZE = 64
 PROCESSED_DATA_DIR = 'data_processed'
 
 
@@ -46,3 +46,45 @@ def load_data_for_training_and_prediction():
 
     # Módosított visszatérés:
     return (X_train, y_train_cat), (X_val, y_val_cat, y_val_labels), X_test, num_classes, test_filenames
+
+
+import cv2
+import numpy as np
+
+
+def morphological_augmentation(image):
+    """
+    Véletlenszerűen vastagítja (dilatáció) vagy vékonyítja (erózió) a vonalakat.
+    A Keras ImageDataGenerator hívja meg minden képre külön-külön.
+    Bemenet: (64, 64, 1) float tömb (0.0 - 1.0 között)
+    """
+    # 1. Döntés: Csináljunk valamit? (50% esély, hogy eredeti marad)
+    if np.random.rand() < 0.5:
+        return image
+
+    # 2. Konvertálás 0-255 uint8 formátumra (az OpenCV ezt szereti)
+    img_uint8 = (image * 255).astype(np.uint8)
+
+    # 3. Kernel létrehozása (az "ecset")
+    # Egy 2x2-es kernel finom változtatást csinál. 3x3 már nagyon durva lenne.
+    kernel = np.ones((2, 2), np.uint8)
+
+    # 4. Véletlen művelet kiválasztása
+    op_type = np.random.choice(["erode", "dilate"])
+
+    if op_type == "erode":
+        # Vékonyítás (Erózió) - pl. ceruza effektus
+        img_aug = cv2.erode(img_uint8, kernel, iterations=1)
+    else:
+        # Vastagítás (Dilatáció) - pl. filctoll effektus
+        img_aug = cv2.dilate(img_uint8, kernel, iterations=1)
+
+    # 5. Visszakonvertálás 0-1 float formátumra és 3D alakra
+    # Fontos: Az OpenCV néha leveszi a csatorna dimenziót, ezt pótolni kell!
+    img_aug = img_aug.astype(np.float32) / 255.0
+
+    # Biztosítjuk, hogy a forma (64, 64, 1) maradjon
+    if len(img_aug.shape) == 2:
+        img_aug = np.expand_dims(img_aug, axis=-1)
+
+    return img_aug

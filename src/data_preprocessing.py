@@ -4,7 +4,7 @@ from PIL import Image
 from tqdm import tqdm
 
 # --- 1. Konfiguráció ---
-IMG_SIZE = 32
+IMG_SIZE = 64
 TRAIN_DATA_DIR = 'data_raw/train'
 TEST_IMAGE_DIR = 'data_raw/test'
 OUTPUT_DIR = 'data_processed'

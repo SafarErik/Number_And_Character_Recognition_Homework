@@ -42,13 +42,13 @@ def save_confusion_matrix_plot(y_true, y_pred, file_path):
     try:
         cm = confusion_matrix(y_true, y_pred)
 
-        plt.figure(figsize=(20, 16))  # Nagyobb méret a több osztály miatt
+        plt.figure(figsize=(20, 16))
         sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
         plt.title('Confusion Matrix')
         plt.ylabel('True Label')
         plt.xlabel('Predicted Label')
 
-        plt.savefig(file_path, dpi=300)  # Nagyobb felbontás
+        plt.savefig(file_path, dpi=300)
         print(f"Konfúziós mátrix elmentve: {file_path}")
         plt.close()
     except Exception as e:
@@ -61,29 +61,31 @@ def save_misclassified_plot(model, X_val, y_val_true_labels, file_path, num_imag
     és elmenti őket egy ábrára.
     """
     print("Elrontott jóslatok keresése a validációs adatokon...")
-    # Jóslatok készítése a validációs adatokra
     y_pred_probs = model.predict(X_val)
-    y_pred_labels = np.argmax(y_pred_probs, axis=1)  # A jósolt indexek
+    y_pred_labels = np.argmax(y_pred_probs, axis=1)
 
-    # Az elrontott képek indexeinek megkeresése
     misclassified_indices = np.where(y_pred_labels != y_val_true_labels)[0]
 
     if len(misclassified_indices) == 0:
         print("Gratulálok! A modell nem hibázott a validációs adatokon.")
         return
 
-    # Véletlenszerű mintavétel az elrontottakból
     num_to_sample = min(num_images, len(misclassified_indices))
     selected_indices = np.random.choice(misclassified_indices, num_to_sample, replace=False)
 
-    # Ábra előkészítése (5 oszlop)
     rows = int(np.ceil(num_to_sample / 5))
     fig, axes = plt.subplots(rows, 5, figsize=(15, 3 * rows + 3))
     axes = axes.flatten()
 
+    #  Dinamikus képméret meghatározása
+    # Az X_val formátuma: (Batch, Height, Width, Channels)
+    # Tehát a shape[1] megadja a képméretet
+    img_size = X_val.shape[1]
+    # ------------------------------------------------
+
     for i, idx in enumerate(selected_indices):
-        # Kép visszaalakítása 2D-be és 0-255 skálára
-        img = (X_val[idx].reshape(32, 32) * 255).astype(np.uint8)
+        # Itt most már az 'img_size' változót használjuk a fix szám helyett
+        img = (X_val[idx].reshape(img_size, img_size) * 255).astype(np.uint8)
 
         true_label = y_val_true_labels[idx]
         pred_label = y_pred_labels[idx]
@@ -93,7 +95,6 @@ def save_misclassified_plot(model, X_val, y_val_true_labels, file_path, num_imag
         ax.set_title(f"Valós: {true_label}\nJósolt: {pred_label}", color='red')
         ax.axis('off')
 
-    # Üres ábrák elrejtése
     for j in range(i + 1, len(axes)):
         axes[j].axis('off')
 

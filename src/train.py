@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import tensorflow as tf
+from keras import mixed_precision
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 from sklearn.metrics import classification_report
@@ -9,16 +10,30 @@ import pandas as pd
 import datetime
 import time
 
-from utils import load_data_for_training_and_prediction as load_data
-from models import build_simple_cnn, build_advanced_cnn, build_keras_mlp, build_hybrid_cnn, build_pro_hybrid_cnn, build_regularized_hybrid_cnn
+from utils import load_data_for_training_and_prediction as load_data, morphological_augmentation
+from models import build_simple_cnn, build_advanced_cnn, build_keras_mlp, build_hybrid_cnn, build_pro_hybrid_cnn, build_regularized_hybrid_cnn, build_deep_hybrid_cnn
 from visualize import save_history_plot, save_misclassified_plot, save_confusion_matrix_plot
+
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        print(f"✅ GPU Memória Growth bekapcsolva ({len(gpus)} GPU)")
+    except RuntimeError as e:
+        print(e)
+
+if gpus:
+    policy = mixed_precision.Policy('mixed_float16')
+    mixed_precision.set_global_policy(policy)
+    print("✅ Mixed Precision (float16) bekapcsolva")
 
 
 # --- 1. Konfiguráció ---
 def parse_args():
     parser = argparse.ArgumentParser(description='Karakterfelismerő modell tanítása.')
     parser.add_argument('--model', type=str, default='advanced',
-                        choices=['simple', 'advanced', 'mlp', 'hybrid', 'pro_hybrid', 'regularized'],
+                        choices=['simple', 'advanced', 'mlp', 'hybrid', 'pro_hybrid', 'regularized', 'resnet', 'deep_hybrid'],
                         help='A használni kívánt modell típusa (default: advanced)')
 
     parser.add_argument('--run_name', type=str, default=None,
@@ -27,7 +42,7 @@ def parse_args():
     parser.add_argument('--epochs', type=int, default=50,
                         help='A tanítási epoch-ok maximális száma (default: 50)')
     parser.add_argument('--batch_size', type=int, default=64,
-                        help='Batch méret (default: 64)')
+                        help='Batch méret (default: 32)')
     parser.add_argument('--no_augmentation', action='store_true',
                         help='Adatbővítés kikapcsolása')
     return parser.parse_args()
@@ -80,6 +95,8 @@ def main():
         model = build_pro_hybrid_cnn(input_shape, num_classes)
     elif args.model == 'regularized':
         model = build_regularized_hybrid_cnn(input_shape, num_classes)
+    elif args.model == 'deep_hybrid':
+        model = build_deep_hybrid_cnn(input_shape, num_classes)
     model.summary()
 
     # --- 4. Callback-ek ---
@@ -107,20 +124,37 @@ def main():
 
         # Alapértelmezett beállítások (pl. a Hybrid modellhez)
         aug_config = {
-            'rotation_range': 20,
+            'rotation_range': 15,
             'width_shift_range': 0.1,
             'height_shift_range': 0.1,
-            'zoom_range': 0.2,
-            'shear_range': 0.1
+            'zoom_range': 0.15,
+            'shear_range': 0.15
         }
 
-        # Ha a 'size_expert' futtatást érzékeljük a névből, kapcsoljuk ki a zoomot!
+        if "shape_expert" in RUN_NAME:
+            print(">> SPECIÁLIS MÓD: Shape Expert (HARD Augmentáció!)")
+            aug_config['zoom_range'] = 0.25
+            aug_config['shear_range'] = 0.25
+            aug_config['rotation_range'] = 25
+
+        # Ha a 'size_expert' --> Zoom off
         if "size_expert" in RUN_NAME:
             print(">> SPECIÁLIS MÓD: Size Expert (Zoom kikapcsolva!)")
             aug_config['zoom_range'] = 0.0
             aug_config['height_shift_range'] = 0.05  # Kevesebb függőleges mozgás is lehet jót tesz neki
 
-        datagen = ImageDataGenerator(**aug_config)  # A ** kicsomagolja a szótárat
+        # Alapból nincs morfológiai augmentáció
+        preprocessing_func = None
+
+        if "thickness_expert" in RUN_NAME:
+            print(">> SPECIÁLIS MÓD: Thickness Expert (Morfológiai Augmentáció!)")
+            # Ilyenkor kikapcsoljuk a zoomot, hogy csak a vastagságra koncentráljon
+            aug_config['zoom_range'] = 0.0
+            preprocessing_func = morphological_augmentation
+
+        datagen = ImageDataGenerator(
+            **aug_config, # A ** kicsomagolja a szótárat
+            preprocessing_function=preprocessing_func)  # Morfológiai augmentáció
         datagen.fit(X_train)
 
         history = model.fit(datagen.flow(X_train, y_train, batch_size=args.batch_size),

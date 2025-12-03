@@ -1,0 +1,1 @@
+docker run --gpus all -it --rm -v ${PWD}:/app karakter-felismero-gpu
