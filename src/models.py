@@ -1,5 +1,5 @@
 import tensorflow as tf
-from keras.src.layers import GlobalAveragePooling2D
+from keras.src.layers import GlobalAveragePooling2D, GlobalMaxPooling2D
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import (
     Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization, Activation
@@ -325,12 +325,7 @@ def build_deep_hybrid_cnn(input_shape, num_classes):
     model.add(MaxPooling2D((2, 2)))  # Itt feleződik 4-re
 
     # --- KIMENET ---
-    model.add(Flatten())  # Most már 4x4x256 = 4096 bemenet érkezik, ami kezelhető
-
-    # Kicsit nagyobb Dense réteg (512), mert több az infó
-    model.add(Dense(512, kernel_initializer='he_normal', kernel_regularizer=reg))
-    model.add(BatchNormalization())
-    model.add(Activation('swish'))
+    model.add(GlobalMaxPooling2D())
 
     model.add(Dropout(0.6))  # Erős dropout a biztonságért
 
@@ -340,7 +335,7 @@ def build_deep_hybrid_cnn(input_shape, num_classes):
     loss_fn = tf.keras.losses.CategoricalCrossentropy(label_smoothing=0.1)
 
     # Kicsit óvatosabb LR a mélyebb hálóhoz + Clipnorm a stabilitásért
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.0005, clipnorm=1.0)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.0003, clipnorm=1.0)
 
     model.compile(optimizer=optimizer, loss=loss_fn, metrics=['accuracy'])
     return model

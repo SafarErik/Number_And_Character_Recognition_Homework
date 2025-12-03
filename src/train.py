@@ -100,15 +100,20 @@ def main():
     model.summary()
 
     # --- 4. Callback-ek ---
-    early_stopper = EarlyStopping(monitor='val_accuracy', patience=10,
-                                  restore_best_weights=True, verbose=1)
+    early_stopper = EarlyStopping(
+        monitor='val_loss',
+        patience=15,
+        restore_best_weights=True,
+        verbose=1,
+        min_delta=0.001
+    )
 
     model_checkpoint_path = os.path.join(RUN_RESULTS_DIR, "best_model.keras")
     model_checkpoint = ModelCheckpoint(model_checkpoint_path, monitor='val_accuracy',
                                        save_best_only=True, verbose=1)
 
-    reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5,
-                                  patience=3, min_lr=0.00001, verbose=1)
+    reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.2,
+                                  patience=5, min_lr=0.00001, verbose=1)
 
     callbacks_list = [early_stopper, model_checkpoint, reduce_lr]
 
@@ -127,8 +132,9 @@ def main():
             'rotation_range': 15,
             'width_shift_range': 0.1,
             'height_shift_range': 0.1,
-            'zoom_range': 0.15,
-            'shear_range': 0.15
+            'zoom_range': 0.0,
+            'shear_range': 0.1,
+            'fill_mode': 'nearest'
         }
 
         if "shape_expert" in RUN_NAME:
@@ -141,7 +147,6 @@ def main():
         if "size_expert" in RUN_NAME:
             print(">> SPECIÁLIS MÓD: Size Expert (Zoom kikapcsolva!)")
             aug_config['zoom_range'] = 0.0
-            aug_config['height_shift_range'] = 0.05  # Kevesebb függőleges mozgás is lehet jót tesz neki
 
         # Alapból nincs morfológiai augmentáció
         preprocessing_func = None

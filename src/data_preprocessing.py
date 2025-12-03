@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps  # <-- FONTOS: ImageOps hozzáadva az invertáláshoz!
 from tqdm import tqdm
 
 # --- 1. Konfiguráció ---
@@ -48,6 +48,12 @@ def process_train_images(data_dir):
             image_path = os.path.join(folder_path, image_name)
             try:
                 img = Image.open(image_path).convert('L')
+
+                # --- INVERTÁLÁS (FEHÉR HÁTTÉR -> FEKETE HÁTTÉR) ---
+                # Ez a lépés segít a modellnek a vonalakra fókuszálni
+                img = ImageOps.invert(img)
+                # --------------------------------------------------
+
                 img = img.resize((IMG_SIZE, IMG_SIZE))
                 pixel_array = np.array(img)
                 flattened_array = pixel_array.flatten()
@@ -79,10 +85,16 @@ def process_test_images_no_labels(image_dir):
         print(f"HIBA: Nem található képfájl a '{image_dir}' mappában!")
         return None, None
     print(f"Címke nélküli teszt képek feldolgozása a(z) '{image_dir}' mappából...")
+
     for image_name in tqdm(image_filenames, desc="Teszt képek"):
         image_path = os.path.join(image_dir, image_name)
         try:
             img = Image.open(image_path).convert('L')
+
+            # --- INVERTÁLÁS ITT IS KÖTELEZŐ! ---
+            img = ImageOps.invert(img)
+            # -----------------------------------
+
             img = img.resize((IMG_SIZE, IMG_SIZE))
             pixel_array = np.array(img)
             flattened_array = pixel_array.flatten()
@@ -90,6 +102,7 @@ def process_test_images_no_labels(image_dir):
             filename_list.append(image_name)
         except Exception as e:
             print(f"\nHiba a(z) {image_path} fájl feldolgozása közben: {e}")
+
     features_X = np.array(image_data_list)
     filenames = np.array(filename_list)
     return features_X, filenames
@@ -113,7 +126,7 @@ def create_visualization_sample(train_dir, output_vis_dir, target_folder='Sample
     img_path = os.path.join(sample_folder, first_image_name)
 
     os.makedirs(output_vis_dir, exist_ok=True)
-    # Tisztítás: mindig csak 2 fájl legyen
+    # Tisztítás
     for f in os.listdir(output_vis_dir):
         try:
             os.remove(os.path.join(output_vis_dir, f))
@@ -121,17 +134,25 @@ def create_visualization_sample(train_dir, output_vis_dir, target_folder='Sample
             pass
 
     try:
+        # 1. Eredeti kép (Fehér háttér)
         original_img = Image.open(img_path)
         original_save_path = os.path.join(output_vis_dir, 'original.png')
         original_img.save(original_save_path)
 
-        processed_img = original_img.convert('L').resize((IMG_SIZE, IMG_SIZE))
-        arr = np.array(processed_img).astype(np.float32) / 255.0  # Normalizálás 0-1
+        # 2. Feldolgozott kép (Invertált, Fekete háttér, 64x64)
+        processed_img = original_img.convert('L')
+        processed_img = ImageOps.invert(processed_img)  # <-- Vizualizációban is invertálunk!
+        processed_img = processed_img.resize((IMG_SIZE, IMG_SIZE))
+
+        arr = np.array(processed_img).astype(np.float32) / 255.0
         arr_to_save = (arr * 255).astype(np.uint8)
-        processed_save_path = os.path.join(output_vis_dir, 'processed_32x32.png')
+        processed_save_path = os.path.join(output_vis_dir, 'processed_inverted_64x64.png')
         Image.fromarray(arr_to_save).save(processed_save_path)
 
-        print(f"Vizualizáció mentve: {original_save_path}, {processed_save_path}")
+        print(f"Vizualizáció mentve:")
+        print(f" - Eredeti: {original_save_path}")
+        print(f" - Feldolgozott (Amit a modell lát): {processed_save_path}")
+
     except Exception as e:
         print(f"HIBA a vizualizáció létrehozásakor: {e}")
 
@@ -168,4 +189,4 @@ if __name__ == "__main__":
     print("\n--- Vizualizáció létrehozása ---")
     create_visualization_sample(TRAIN_DATA_DIR, VISUALIZATION_DIR, target_folder='Sample001')
 
-    print("\nAdat-előkészítés befejezve!")
+    print("\nAdat-előkészítés befejezve! Kérlek, ellenőrizd a 'visualization' mappát!")
