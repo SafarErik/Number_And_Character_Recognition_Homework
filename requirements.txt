@@ -1,0 +1,10 @@
+tensorflow
+numpy<2.0
+pandas
+pillow
+tqdm
+scikit-learn
+matplotlib
+seaborn
+keras-tuner
+opencv-python-headless<4.11

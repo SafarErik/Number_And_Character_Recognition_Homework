@@ -1,62 +1,86 @@
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, confusion_matrix
+import os
+import cv2
 
-IMG_SIZE = 28
+IMG_SIZE = 64
+PROCESSED_DATA_DIR = 'data_processed'
 
 
-def load_data(model_type='cnn'):
-    """
-    Betölti az előfeldolgozott .npy fájlokat és előkészíti őket.
-    model_type: 'cnn' vagy 'mlp' (ez dönti el a reshape-et)
-    """
-    X_train_full = np.load('data_processed/train_features.npy')
-    y_train_full = np.load('data_processed/train_labels.npy')
-    X_test = np.load('data_processed/test_features.npy')
-    y_test = np.load('data_processed/test_labels.npy')
+def load_data_for_training_and_prediction():
+    try:
+        X_train_full = np.load(os.path.join(PROCESSED_DATA_DIR, 'train_features.npy'))
+        y_train_full = np.load(os.path.join(PROCESSED_DATA_DIR, 'train_labels.npy'))
+        X_test = np.load(os.path.join(PROCESSED_DATA_DIR, 'test_features.npy'))
+        test_filenames = np.load(os.path.join(PROCESSED_DATA_DIR, 'test_filenames.npy'))
+    except FileNotFoundError as e:
+        print(f"ERROR: Processed .npy files not found: {e}")
+        return None
 
-    # Normalizálás
+    if X_train_full.size == 0 or X_test.size == 0:
+        print(f"ERROR: Loaded data is empty.")
+        return None
+
+    # --- CLASS CALCULATION ---
+    max_label = np.max(y_train_full)
+    num_classes = max_label + 1
+    print(f"Labels loaded. Highest ID: {max_label}. Number of classes: {num_classes}")
+
+    # --- Prepare Training Data ---
     X_train_full = X_train_full / 255.0
-    X_test = X_test / 255.0
+    X_train_full = X_train_full.reshape(-1, IMG_SIZE, IMG_SIZE, 1)
 
-    # Osztályok számának meghatározása
-    num_classes = len(np.unique(y_train_full))
-
-    if model_type == 'cnn':
-        # 4D-re alakítás CNN-hez: (db, mag, szél, csat)
-        X_train_full = X_train_full.reshape(-1, IMG_SIZE, IMG_SIZE, 1)
-        X_test = X_test.reshape(-1, IMG_SIZE, IMG_SIZE, 1)
-        # One-hot kódolás
-        y_train_full = tf.keras.utils.to_categorical(y_train_full, num_classes)
-        y_test = tf.keras.utils.to_categorical(y_test, num_classes)
-
-    # Készítünk egy belső validációs halmazt a tanító adatokból
-    X_train, X_val, y_train, y_val = train_test_split(
-        X_train_full, y_train_full, test_size=0.2, random_state=42
+    X_train, X_val, y_train_labels, y_val_labels = train_test_split(
+        X_train_full, y_train_full,
+        test_size=0.2,
+        random_state=42,
+        stratify=y_train_full
     )
+    # One-hot encoding
+    y_train_cat = tf.keras.utils.to_categorical(y_train_labels, num_classes)
+    y_val_cat = tf.keras.utils.to_categorical(y_val_labels, num_classes)
 
-    return (X_train, y_train), (X_val, y_val), (X_test, y_test), num_classes
+    # --- Prepare Test Data ---
+    X_test = X_test / 255.0
+    X_test = X_test.reshape(-1, IMG_SIZE, IMG_SIZE, 1)
+
+    return (X_train, y_train_cat), (X_val, y_val_cat, y_val_labels), X_test, num_classes, test_filenames
 
 
-def save_evaluation(history, model, X_test, y_test_labels, model_name="model"):
+def morphological_augmentation(image):
     """
-    Elmenti a kiértékelő ábrákat és riportokat a 'results/' mappába.
+    Randomly thickens (dilation) or thins (erosion) the lines.
+    Called by Keras ImageDataGenerator for each image.
+    Input: (64, 64, 1) float array (0.0 - 1.0)
     """
-    # ... (ide jöhet a history plot-oló kód) ...
-    plt.savefig(f'results/{model_name}_accuracy_loss.png')
+    # 1. Decision: Do something? (50% chance to stay original)
+    if np.random.rand() < 0.5:
+        return image
 
-    # ... (ide jöhet a konfúziós mátrix kódja) ...
-    plt.savefig(f'results/{model_name}_confusion_matrix.png')
+    # 2. Convert to 0-255 uint8 format (OpenCV likes this)
+    img_uint8 = (image * 255).astype(np.uint8)
 
-    # ... (classification report mentése fájlba) ...
-    y_pred_probs = model.predict(X_test)
-    y_pred = np.argmax(y_pred_probs, axis=1)
+    # 3. Create Kernel (the "brush")
+    # A 2x2 kernel makes subtle changes. 3x3 would be too strong.
+    kernel = np.ones((2, 2), np.uint8)
 
-    report = classification_report(y_test_labels, y_pred)
-    with open(f'results/{model_name}_report.txt', 'w') as f:
-        f.write(report)
+    # 4. Choose random operation
+    op_type = np.random.choice(["erode", "dilate"])
 
-    print(f"Kiértékelés elmentve a 'results/{model_name}' néven.")
+    if op_type == "erode":
+        # Thinning (Erosion) - e.g. pencil effect
+        img_aug = cv2.erode(img_uint8, kernel, iterations=1)
+    else:
+        # Thickening (Dilation) - e.g. marker effect
+        img_aug = cv2.dilate(img_uint8, kernel, iterations=1)
+
+    # 5. Convert back to 0-1 float format and 3D shape
+    # Important: OpenCV sometimes removes the channel dimension, we must restore it!
+    img_aug = img_aug.astype(np.float32) / 255.0
+
+    # Ensure shape remains (64, 64, 1)
+    if len(img_aug.shape) == 2:
+        img_aug = np.expand_dims(img_aug, axis=-1)
+
+    return img_aug
