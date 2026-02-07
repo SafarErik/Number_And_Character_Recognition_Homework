@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import tensorflow as tf
-from PIL import Image
+from PIL import Image, ImageOps
 import pandas as pd
 from tqdm import tqdm
 import argparse
@@ -69,6 +69,7 @@ def main():
         try:
             # Load and prepare image (Same as training!)
             img = Image.open(image_path).convert('L')
+            img = ImageOps.invert(img)  # <-- Invert to match training domain!
             img = img.resize((IMG_SIZE, IMG_SIZE))
             img_array = np.array(img)
             img_array = img_array / 255.0  # Normalize

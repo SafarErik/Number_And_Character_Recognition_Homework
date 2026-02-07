@@ -144,7 +144,6 @@ def create_visualization_sample(train_dir, output_vis_dir, target_folder='Sample
 
     os.makedirs(output_vis_dir, exist_ok=True)
     # Clean up previous visualizations
-    # Clean up previous visualizations
     for f in os.listdir(output_vis_dir):
         file_path = os.path.join(output_vis_dir, f)
         try:
@@ -170,7 +169,7 @@ def create_visualization_sample(train_dir, output_vis_dir, target_folder='Sample
         processed_save_path = os.path.join(output_vis_dir, 'processed_inverted_64x64.png')
         Image.fromarray(arr_to_save).save(processed_save_path)
 
-        print(f"Visualization saved:")
+        print("Visualization saved:")
         print(f" - Original: {original_save_path}")
         print(f" - Processed (As seen by model): {processed_save_path}")
 

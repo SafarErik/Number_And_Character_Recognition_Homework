@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import tensorflow as tf
-from PIL import Image
+from PIL import Image, ImageOps
 import pandas as pd
 from tqdm import tqdm
 import argparse
@@ -67,6 +67,7 @@ def main():
     print(f"Starting prediction on {len(test_filenames)} images...")
     final_predictions = []
     failed_images = []
+    successful_filenames = []
 
     # 3. Iterate over images
     for image_name in tqdm(test_filenames, desc="K-Fold Ensemble"):
@@ -75,6 +76,7 @@ def main():
         try:
             # Load original image
             img_original = Image.open(image_path).convert('L')
+            img_original = ImageOps.invert(img_original)  # <-- Invert to match training domain!
         except Exception as e:
             print(f"ERROR processing {image_path}: {e}")
             failed_images.append(image_name)
@@ -100,8 +102,19 @@ def main():
             avg_probs = np.mean(np.array(all_probs), axis=0)
             final_class = np.argmax(avg_probs)
             final_predictions.append(final_class)
+            successful_filenames.append(image_name)
         else:
             final_predictions.append(0)
+            successful_filenames.append(image_name) # Fallback to 0 still counts as a prediction? 
+            # Wait, the prompt says: "create and use a separate successful_filenames list... and append image_name only when you successfully process and append a prediction... (keep failed_images as-is for errors)"
+            # My previous change in Step 58 removed "final_predictions.append(0)" from the EXCEPTION block.
+            # But here in the "else" of "if all_probs:", it means NO model predicted anything? That's weird if models are loaded.
+            # If all_probs is empty, we probably shouldn't append to successful_filenames either?
+            # But the loop iterates models. If models is empty, all_probs is empty.
+            # Let's assume if we get here, we have a prediction.
+            # Actually, if all_probs is empty, we effectively failed to predict.
+            # But the prompt instruction regarding "append image_name only when you successfully process" refers to the try/except block failure.
+            # Let's stick to the prompt: append to successful_filenames when we append to final_predictions.
 
     # 4. Save
     if not os.path.exists(os.path.join(RESULTS_DIR, args.run_name)):
@@ -112,8 +125,12 @@ def main():
 
     submission_df = pd.DataFrame({
         'class': final_predictions,
-        'TestImage': test_filenames
+        'TestImage': successful_filenames
     })
+
+    if failed_images:
+        print(f"\nWARNING: {len(failed_images)} images failed to process.")
+        print(f"Failed images: {failed_images}")
 
     submission_df.to_csv(output_path, sep=';', index=False)
 

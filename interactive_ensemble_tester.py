@@ -24,18 +24,12 @@ def get_character_from_label(label):
     """
     label = int(label)
 
-    if 1 <= label <= 10:
-        # Numbers '0'-'9' (Label 1 -> '0')
-        return chr(ord('0') + (label - 1))
-
-    elif 11 <= label <= 36:
-        # Uppercase 'A'-'Z' (Label 11 -> 'A')
-        return chr(ord('A') + (label - 11))
-
-    elif 37 <= label <= 62:
-        # Lowercase 'a'-'z' (Label 37 -> 'a')
-        return chr(ord('a') + (label - 37))
-
+    if 0 <= label <= 9:
+        return str(label)
+    elif 10 <= label <= 35:
+        return chr(ord('A') + (label - 10))
+    elif 36 <= label <= 61:
+        return chr(ord('a') + (label - 36))
     else:
         return "?"
 
@@ -90,11 +84,14 @@ class EnsembleApp:
         self.label_details.pack(pady=5)
 
     def paint(self, event):
-        x1, y1 = (event.x - 1), (event.y - 1)
-        x2, y2 = (event.x + 1), (event.y + 1)
-        self.canvas.create_oval(x1, y1, x2, y2, fill="black", width=BRUSH_SIZE)
-        self.draw.ellipse([event.x - BRUSH_SIZE // 2, event.y - BRUSH_SIZE // 2,
-                           event.x + BRUSH_SIZE // 2, event.y + BRUSH_SIZE // 2], fill=0)
+        # Match canvas (screen) to PIL (model input)
+        # PIL draw.ellipse fills the circle. Canvas should do the same visually.
+        r = BRUSH_SIZE // 2
+        x1, y1 = (event.x - r), (event.y - r)
+        x2, y2 = (event.x + r), (event.y + r)
+        
+        self.canvas.create_oval(x1, y1, x2, y2, fill="black", outline="black")
+        self.draw.ellipse([x1, y1, x2, y2], fill=0)
 
     def clear(self):
         self.canvas.delete("all")
@@ -131,7 +128,6 @@ class EnsembleApp:
             print(f"{self.model_names[i]}: '{p_char}' ({p_class}) - {p_conf:.1f}%")
             details_text += f"{name_short}: '{p_char}' ({p_conf:.1f}%)\n"
 
-        # Weighting
         # Weighting
         weights = None
         
