@@ -8,17 +8,17 @@ import argparse
 
 from src.utils import IMG_SIZE
 
-# --- Konfiguráció ---
+# --- Configuration ---
 TEST_IMAGE_DIR = 'data_raw/test'
 RESULTS_DIR = 'results'
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Ensemble (több modell) jóslat készítése a TESZT adatokra.')
+    parser = argparse.ArgumentParser(description='Ensemble (multi-model) prediction on TEST data.')
     parser.add_argument('--runs', nargs='+', required=True,
-                        help='A futtatások nevei (mappák a results/ alatt).')
+                        help='Run names (folders under results/).')
     parser.add_argument('--output_name', type=str, default='final_ensemble_submission',
-                        help='A kimeneti fájl neve.')
+                        help='Output file name.')
     return parser.parse_args()
 
 
@@ -27,11 +27,11 @@ def load_models(run_names):
     for run_name in run_names:
         model_path = os.path.join(RESULTS_DIR, run_name, 'best_model.keras')
         try:
-            print(f"Modell betöltése: {run_name}...")
+            print(f"Loading model: {run_name}...")
             model = tf.keras.models.load_model(model_path)
             models.append(model)
         except Exception as e:
-            print(f"HIBA: Nem sikerült betölteni a modellt: {model_path}")
+            print(f"ERROR: Failed to load model: {model_path}")
             print(e)
             exit()
     return models
@@ -40,74 +40,81 @@ def load_models(run_names):
 def main():
     args = parse_args()
 
-    # 1. Modellek betöltése
+    # 1. Load Models
     models = load_models(args.runs)
-    print(f"\nSikeresen betöltve {len(models)} modell.")
+    print(f"\nSuccessfully loaded {len(models)} models.")
 
-    # 2. Teszt fájlok listázása
+    # 2. List Test Files
     try:
         test_filenames = sorted([
             f for f in os.listdir(TEST_IMAGE_DIR)
             if f.lower().endswith(('.png', '.jpg', '.jpeg'))
         ])
     except FileNotFoundError:
-        print(f"HIBA: Nem található a teszt mappa: {TEST_IMAGE_DIR}")
+        print(f"ERROR: Test directory not found: {TEST_IMAGE_DIR}")
         exit()
 
     if not test_filenames:
-        print("HIBA: Nincsenek képek a teszt mappában.")
+        print("ERROR: No images found in the test directory.")
         exit()
 
-    print(f"Predikció indítása {len(test_filenames)} képen...")
+    print(f"Starting prediction on {len(test_filenames)} images...")
 
     final_predictions = []
 
-    # 3. Végigmegyünk a képeken
-    for image_name in tqdm(test_filenames, desc="Ensemble Predikció"):
+    # 3. Process Images
+    for image_name in tqdm(test_filenames, desc="Ensemble Prediction"):
         image_path = os.path.join(TEST_IMAGE_DIR, image_name)
 
         try:
-            # Kép betöltése és előkészítése (Ugyanúgy, mint a tanításnál!)
+            # Load and prepare image (Same as training!)
             img = Image.open(image_path).convert('L')
             img = img.resize((IMG_SIZE, IMG_SIZE))
             img_array = np.array(img)
-            img_array = img_array / 255.0  # Normalizálás
+            img_array = img_array / 255.0  # Normalize
 
-            # (1, 32, 32, 1) formátum
+            # Format: (1, 64, 64, 1) or whatever IMG_SIZE is
             img_ready = img_array.reshape(1, IMG_SIZE, IMG_SIZE, 1)
 
         except Exception as e:
-            print(f"Hiba a kép feldolgozásakor ({image_name}): {e}")
-            # Hiba esetén 0-t tippelünk (vagy bármit, hogy ne álljon meg a kód)
+            print(f"Error processing image ({image_name}): {e}")
+            # Predict 0 on error (or safe fallback)
             final_predictions.append(0)
             continue
 
-        # --- ENSEMBLE LOGIKA ---
+        # --- ENSEMBLE LOGIC ---
         all_probs = []
         for model in models:
+            # Adjust input shape if necessary (though IMG_SIZE should trigger resize match)
+            # Check model input shape to be safe?
+            # model_img_size = model.input_shape[1]
+            # if model_img_size != IMG_SIZE: ... (Skipping for now assuming consistency)
+
             probs = model.predict(img_ready, verbose=0)
             all_probs.append(probs)
 
-        # NumPy tömbbé alakítás a súlyozáshoz
-        stacked_probs = np.array(all_probs)  # Shape: (Modellek, 1, 62)
-        # Az extra dimenziót (1) el kell tüntetni a shape-ből
+        # Convert to NumPy array for weighting
+        stacked_probs = np.array(all_probs)  # Shape: (Models, 1, 62)
+        # Remove extra dimension (1) from shape
         stacked_probs = np.squeeze(stacked_probs, axis=1)
 
-        # --- SÚLYOZÁS ---
-        # Ugyanazokat a súlyok, mint az analyze_ensemble.py-ban
-        # Sorrend: [FineTuned, Shape, Structure]
-        weights = [0.6, 0.2, 0.2]
+        # --- WEIGHTING ---
+        # Example weights: [FineTuned, Shape, Structure]
+        # Modify this logic if dynamic weighting is needed
+        weights = None
+        if len(models) == 3:
+             weights = [0.6, 0.2, 0.2]
 
-        if len(models) == len(weights):
+        if weights and len(models) == len(weights):
             avg_probs = np.average(stacked_probs, axis=0, weights=weights)
         else:
-            # Ha véletlenül nem 3, sima átlagolás lesz.
+            # Simple average if counts don't match
             avg_probs = np.mean(stacked_probs, axis=0)
 
         final_class = np.argmax(avg_probs)
         final_predictions.append(final_class)
 
-    # 4. Eredmény mentése
+    # 4. Save Results
     output_path = os.path.join(RESULTS_DIR, f"{args.output_name}.csv")
 
     submission_df = pd.DataFrame({
@@ -117,7 +124,7 @@ def main():
 
     submission_df.to_csv(output_path, sep=';', index=False)
 
-    print(f"\nKimeneti fájl mentve: {output_path}")
+    print(f"\nOutput file saved: {output_path}")
 
 if __name__ == "__main__":
     main()

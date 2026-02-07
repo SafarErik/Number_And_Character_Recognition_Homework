@@ -6,12 +6,12 @@ import numpy as np
 
 def save_history_plot(history, file_path):
     """
-    Elmenti a tanítási és validációs görbéket egy képfájlba.
+    Saves training and validation curves to an image file.
     """
     try:
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
 
-        # Pontosság ábra
+        # Accuracy Plot
         ax1.plot(history.history['accuracy'], label='Training Accuracy')
         ax1.plot(history.history['val_accuracy'], label='Validation Accuracy')
         ax1.set_title('Model Accuracy')
@@ -20,7 +20,7 @@ def save_history_plot(history, file_path):
         ax1.legend(loc='lower right')
         ax1.grid(True)
 
-        # Hiba ábra
+        # Loss Plot
         ax2.plot(history.history['loss'], label='Training Loss')
         ax2.plot(history.history['val_loss'], label='Validation Loss')
         ax2.set_title('Model Loss')
@@ -30,14 +30,15 @@ def save_history_plot(history, file_path):
         ax2.grid(True)
 
         plt.savefig(file_path)
-        print(f"Tanítási görbék elmentve: {file_path}")
+        print(f"Training curves saved: {file_path}")
         plt.close()
     except Exception as e:
-        print(f"Hiba a görbék mentésekor: {e}")
+        print(f"Error saving curves: {e}")
+
 
 def save_confusion_matrix_plot(y_true, y_pred, file_path):
     """
-    Elmenti a konfúziós mátrixot egy képfájlba.
+    Saves the confusion matrix to an image file.
     """
     try:
         cm = confusion_matrix(y_true, y_pred)
@@ -49,25 +50,25 @@ def save_confusion_matrix_plot(y_true, y_pred, file_path):
         plt.xlabel('Predicted Label')
 
         plt.savefig(file_path, dpi=300)
-        print(f"Konfúziós mátrix elmentve: {file_path}")
+        print(f"Confusion matrix saved: {file_path}")
         plt.close()
     except Exception as e:
-        print(f"Hiba a konfúziós mátrix mentésekor: {e}")
+        print(f"Error saving confusion matrix: {e}")
 
 
 def save_misclassified_plot(model, X_val, y_val_true_labels, file_path, num_images=25):
     """
-    Kiválaszt véletlenszerűen elrontott képeket a validációs halmazból
-    és elmenti őket egy ábrára.
+    Selects random misclassified images from the validation set
+    and saves them to a plot.
     """
-    print("Elrontott jóslatok keresése a validációs adatokon...")
+    print("Searching for misclassified predictions on validation data...")
     y_pred_probs = model.predict(X_val)
     y_pred_labels = np.argmax(y_pred_probs, axis=1)
 
     misclassified_indices = np.where(y_pred_labels != y_val_true_labels)[0]
 
     if len(misclassified_indices) == 0:
-        print("Gratulálok! A modell nem hibázott a validációs adatokon.")
+        print("Congratulations! The model made no errors on the validation data.")
         return
 
     num_to_sample = min(num_images, len(misclassified_indices))
@@ -77,14 +78,11 @@ def save_misclassified_plot(model, X_val, y_val_true_labels, file_path, num_imag
     fig, axes = plt.subplots(rows, 5, figsize=(15, 3 * rows + 3))
     axes = axes.flatten()
 
-    #  Dinamikus képméret meghatározása
-    # Az X_val formátuma: (Batch, Height, Width, Channels)
-    # Tehát a shape[1] megadja a képméretet
+    # Dynamic image size determination
+    # X_val shape: (Batch, Height, Width, Channels)
     img_size = X_val.shape[1]
-    # ------------------------------------------------
 
     for i, idx in enumerate(selected_indices):
-        # Itt most már az 'img_size' változót használjuk a fix szám helyett
         img = (X_val[idx].reshape(img_size, img_size) * 255).astype(np.uint8)
 
         true_label = y_val_true_labels[idx]
@@ -92,14 +90,14 @@ def save_misclassified_plot(model, X_val, y_val_true_labels, file_path, num_imag
 
         ax = axes[i]
         ax.imshow(img, cmap='gray')
-        ax.set_title(f"Valós: {true_label}\nJósolt: {pred_label}", color='red')
+        ax.set_title(f"True: {true_label}\nPred: {pred_label}", color='red')
         ax.axis('off')
 
     for j in range(i + 1, len(axes)):
         axes[j].axis('off')
 
     plt.tight_layout(pad=2.0)
-    plt.suptitle("Példák elrontott jóslatokra", fontsize=16, y=1.03)
+    plt.suptitle("Examples of Misclassified Predictions", fontsize=16, y=1.03)
     plt.savefig(file_path)
-    print(f"Elrontott jóslatok ábrája elmentve: {file_path}")
+    print(f"Misclassified predictions plot saved: {file_path}")
     plt.close()

@@ -14,7 +14,7 @@ from utils import (
     morphological_augmentation
 )
 
-# --- MODELLEK IMPORTÁLÁSA ---
+# --- IMPORT MODELS ---
 from models import (
     build_simple_cnn,
     build_advanced_cnn,
@@ -25,8 +25,8 @@ from models import (
     build_deep_hybrid_cnn
 )
 
-# --- MODELL VÁLASZTÓ SZÓTÁR ---
-# Ez köti össze a szöveges nevet a konkrét függvénnyel
+# --- MODEL SELECTION DICTIONARY ---
+# Map string names to functions
 MODEL_BUILDERS = {
     'simple': build_simple_cnn,
     'advanced': build_advanced_cnn,
@@ -48,17 +48,17 @@ if gpus:
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Általános K-Fold Keresztvalidáció.')
+    parser = argparse.ArgumentParser(description='General K-Fold Cross-Validation.')
 
-    # --- ÚJ ARGUMENTUM: MODELL VÁLASZTÁS ---
+    # --- NEW ARGUMENT: MODEL SELECTION ---
     parser.add_argument('--model', type=str, default='regularized',
-                        choices=list(MODEL_BUILDERS.keys()),  # Automatikusan felsorolja a lehetőségeket
-                        help='Melyik modellt validáljuk? (default: regularized)')
+                        choices=list(MODEL_BUILDERS.keys()),
+                        help='Which model to validate? (default: regularized)')
 
-    parser.add_argument('--folds', type=int, default=5, help='Foldok száma')
-    parser.add_argument('--epochs', type=int, default=40, help='Epochok száma')
-    parser.add_argument('--batch_size', type=int, default=32, help='Batch méret')
-    parser.add_argument('--run_name_prefix', type=str, default="kfold", help='Mentés előtagja')
+    parser.add_argument('--folds', type=int, default=5, help='Number of folds')
+    parser.add_argument('--epochs', type=int, default=40, help='Number of epochs')
+    parser.add_argument('--batch_size', type=int, default=32, help='Batch size')
+    parser.add_argument('--run_name_prefix', type=str, default="kfold", help='Prefix for the results directory')
 
     return parser.parse_args()
 
@@ -66,37 +66,37 @@ def parse_args():
 def main():
     args = parse_args()
 
-    # A mappa nevébe beleírjuk a választott modellt is, hogy ne keveredjenek
+    # Include model name in directory to avoid conflicts
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     full_run_name = f"{args.run_name_prefix}_{args.model}_{timestamp}"
     BASE_SAVE_DIR = os.path.join('results', full_run_name)
 
     os.makedirs(BASE_SAVE_DIR, exist_ok=True)
 
-    print(f"\n--- K-FOLD INDULÁSA: {args.model.upper()} MODELL ---")
-    print(f"Képméret: {IMG_SIZE}x{IMG_SIZE}")
-    print(f"Foldok száma: {args.folds}")
-    print(f"Mentés helye: {BASE_SAVE_DIR}")
+    print(f"\n--- STARTING K-FOLD: {args.model.upper()} MODEL ---")
+    print(f"Image Size: {IMG_SIZE}x{IMG_SIZE}")
+    print(f"Number of Folds: {args.folds}")
+    print(f"Saving to: {BASE_SAVE_DIR}")
 
-    # 1. ADATOK
-    print("Adatok betöltése...")
+    # 1. DATA
+    print("Loading data...")
     try:
         X_raw = np.load(os.path.join(PROCESSED_DATA_DIR, 'train_features.npy'))
         y_raw = np.load(os.path.join(PROCESSED_DATA_DIR, 'train_labels.npy'))
     except Exception as e:
-        print(f"Hiba: {e}")
+        print(f"Error: {e}")
         return
 
     X_full = X_raw / 255.0
     X_full = X_full.reshape(-1, IMG_SIZE, IMG_SIZE, 1)
     num_classes = np.max(y_raw) + 1
 
-    # 2. CIKLUS
+    # 2. LOOP
     skf = StratifiedKFold(n_splits=args.folds, shuffle=True, random_state=42)
     fold_no = 1
     accuracies = []
 
-    # Kiválasztjuk a megfelelő építő függvényt a szótárból
+    # Get the builder function
     model_builder_func = MODEL_BUILDERS[args.model]
 
     for train_index, val_index in skf.split(X_full, y_raw):
@@ -110,7 +110,7 @@ def main():
         y_train = tf.keras.utils.to_categorical(y_train_raw, num_classes)
         y_val = tf.keras.utils.to_categorical(y_val_raw, num_classes)
 
-        # Augmentáció (Morfológiával)
+        # Augmentation (With Morphology)
         datagen = ImageDataGenerator(
             rotation_range=15,
             width_shift_range=0.1,
@@ -121,8 +121,7 @@ def main():
         )
         datagen.fit(X_train)
 
-        # --- DINAMIKUS MODELL ÉPÍTÉS ---
-        # Itt hívjuk meg a kiválasztott függvényt!
+        # --- DYNAMIC MODEL BUILDING ---
         model = model_builder_func(input_shape=(IMG_SIZE, IMG_SIZE, 1), num_classes=num_classes)
 
         checkpoint_path = os.path.join(BASE_SAVE_DIR, f"model_fold_{fold_no}.keras")
@@ -141,11 +140,11 @@ def main():
             verbose=1
         )
 
-        # Kiértékelés
+        # Evaluation
         model.load_weights(checkpoint_path)
         scores = model.evaluate(X_val, y_val, verbose=0)
         acc = scores[1] * 100
-        print(f"-> Fold {fold_no} pontossága: {acc:.2f}%")
+        print(f"-> Fold {fold_no} Accuracy: {acc:.2f}%")
         accuracies.append(acc)
 
         del model
@@ -153,7 +152,7 @@ def main():
         gc.collect()
         fold_no += 1
 
-    print(f"\nÁTLAGOS PONTOSSÁG ({args.model}): {np.mean(accuracies):.2f}%")
+    print(f"\nAVERAGE ACCURACY ({args.model}): {np.mean(accuracies):.2f}%")
 
 
 if __name__ == "__main__":

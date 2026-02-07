@@ -5,17 +5,17 @@ import tensorflow as tf
 import os
 import argparse
 
-# --- JAVÍTOTT IMPORT: Az src mappából hívjuk be! ---
+# --- IMPORT: Load from src folder! ---
 from src.models import build_deep_hybrid_cnn
 
-# --- Konfiguráció ---
+# --- Configuration ---
 IMG_SIZE = 64
 BRUSH_SIZE = 18
-NUM_CLASSES = 63  # 0-62 osztály
+NUM_CLASSES = 63  # 0-62 classes
 
-parser = argparse.ArgumentParser(description='Interaktív rajzolós tesztelő.')
+parser = argparse.ArgumentParser(description='Interactive Drawing Tester.')
 parser.add_argument('--run_name', type=str, required=True,
-                    help='A modell mappájának neve (pl. v16_...)')
+                    help='Folder name of the model (e.g. v16_...)')
 args = parser.parse_args()
 
 MODEL_PATH = os.path.join('results', args.run_name, 'best_model.keras')
@@ -23,7 +23,7 @@ MODEL_PATH = os.path.join('results', args.run_name, 'best_model.keras')
 
 def get_character_from_label(label):
     """
-    Visszaadja a valós karaktert a numerikus címke alapján.
+    Returns the actual character based on the numeric label.
     """
     label = int(label)
     if 1 <= label <= 10:
@@ -39,30 +39,30 @@ def get_character_from_label(label):
 class App:
     def __init__(self, root):
         self.root = root
-        self.root.title(f"Tesztelő: {args.run_name}")
+        self.root.title(f"Tester: {args.run_name}")
 
-        print(f"Modell struktúra építése és súlyok betöltése innen: {MODEL_PATH}...")
+        print(f"Building model structure and loading weights from: {MODEL_PATH}...")
 
         try:
-            # 1. LÉPÉS: Felépítjük az üres modellt kódból
+            # STEP 1: Build the empty model from code
             self.model = build_deep_hybrid_cnn(input_shape=(IMG_SIZE, IMG_SIZE, 1), num_classes=NUM_CLASSES)
 
-            # 2. LÉPÉS: Csak a súlyokat töltjük be
+            # STEP 2: Load only the weights
             self.model.load_weights(MODEL_PATH)
 
-            print("✅ Modell és súlyok sikeresen betöltve!")
+            print("✅ Model and weights loaded successfully!")
 
         except Exception as e:
-            print(f"\nKRITIKUS HIBA: Nem sikerült betölteni a súlyokat: {e}")
-            print("Ellenőrizd, hogy biztosan a 'deep_hybrid' modellt használtad-e!")
+            print(f"\nCRITICAL ERROR: Failed to load weights: {e}")
+            print("Check if you are using the 'deep_hybrid' model!")
             self.root.destroy()
             return
 
-        # UI Felépítése
+        # Build UI
         self.canvas = tk.Canvas(root, width=320, height=320, bg='white', cursor="cross")
         self.canvas.pack(pady=10)
 
-        # PIL kép: Fehér háttér (255) - Emberi szemnek
+        # PIL image: White background (255) - For human eyes
         self.image = Image.new("L", (320, 320), 255)
         self.draw = ImageDraw.Draw(self.image)
 
@@ -71,15 +71,15 @@ class App:
         btn_frame = tk.Frame(root)
         btn_frame.pack()
 
-        self.btn_predict = tk.Button(btn_frame, text="JÓSLÁS", command=self.predict,
+        self.btn_predict = tk.Button(btn_frame, text="PREDICT", command=self.predict,
                                      bg="#dddddd", font=("Helvetica", 12, "bold"))
         self.btn_predict.pack(side=tk.LEFT, padx=5)
 
-        self.btn_clear = tk.Button(btn_frame, text="Törlés", command=self.clear,
+        self.btn_clear = tk.Button(btn_frame, text="Clear", command=self.clear,
                                    bg="#ffcccc", font=("Helvetica", 12))
         self.btn_clear.pack(side=tk.LEFT, padx=5)
 
-        self.label_result = tk.Label(root, text="Rajzolj egy karaktert!", font=("Helvetica", 20, "bold"), fg="blue")
+        self.label_result = tk.Label(root, text="Draw a character!", font=("Helvetica", 20, "bold"), fg="blue")
         self.label_result.pack(pady=20)
 
     def paint(self, event):
@@ -93,21 +93,21 @@ class App:
         self.canvas.delete("all")
         self.image = Image.new("L", (320, 320), 255)
         self.draw = ImageDraw.Draw(self.image)
-        self.label_result.config(text="Rajzolj egy karaktert!")
+        self.label_result.config(text="Draw a character!")
 
     def predict(self):
-        # 1. Invertálás (Fekete háttér, Fehér betű - ahogy a modell tanult)
+        # 1. Invert (Black background, White char - as the model learned)
         img_inverted = ImageOps.invert(self.image)
 
-        # 2. Átméretezés
+        # 2. Resize
         img_resized = img_inverted.resize((IMG_SIZE, IMG_SIZE), Image.Resampling.LANCZOS)
 
-        # 3. Normalizálás
+        # 3. Normalize
         img_array = np.array(img_resized)
         img_array = img_array / 255.0
         img_ready = img_array.reshape(1, IMG_SIZE, IMG_SIZE, 1)
 
-        # 4. Jóslás
+        # 4. Predict
         probs = self.model.predict(img_ready, verbose=0)[0]
         pred_class = np.argmax(probs)
         confidence = np.max(probs) * 100
@@ -115,15 +115,15 @@ class App:
         pred_char = get_character_from_label(pred_class)
 
         fg_color = "green" if confidence > 80 else "orange" if confidence > 50 else "red"
-        result_text = f"Tipp: '{pred_char}'\n({confidence:.1f}%)"
+        result_text = f"Prediction: '{pred_char}'\n({confidence:.1f}%)"
 
         self.label_result.config(text=result_text, fg=fg_color)
-        print(f"Jóslat: '{pred_char}' (Class ID: {pred_class}), Biztosság: {confidence:.2f}%")
+        print(f"Result: '{pred_char}' (Class ID: {pred_class}), Confidence: {confidence:.2f}%")
 
 
 if __name__ == "__main__":
     if not args.run_name:
-        print("HIBA: Használat: python interactive_tester.py --run_name MAPPA_NEVE")
+        print("ERROR: Usage: python interactive_tester.py --run_name FOLDER_NAME")
     else:
         root = tk.Tk()
         app = App(root)

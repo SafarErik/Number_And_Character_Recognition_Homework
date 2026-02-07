@@ -1,91 +1,118 @@
-# Karakterfelismerő CNN Projekt
+# Handwritten Character Recognition CNN
 
-Ez a projekt egy Konvolúciós Neurális Hálót (CNN) tanít be, ami képes felismerni kézzel írott számokat és betűket. A projekt professzionális, skálázható Python csomagstruktúrát használ a kísérletek tiszta és átlátható követéséhez.
+This project implements a Convolutional Neural Network (CNN) to recognize handwritten characters and digits. It features a modular Python package structure, multiple model architectures (Simple CNN, Advanced CNN, ResNet50 Transfer Learning, Hybrid CNN), and utilities for data preprocessing, training, evaluation, and hyperparameter tuning.
 
-## Használat
+## Features
 
-### 1\. Telepítés
+- **Multiple Architectures**: Includes Simple, Advanced, Hybrid, and ResNet-based models.
+- **Data Augmentation**: Supports real-time data augmentation (rotation, shift, shear, zoom) and custom morphological augmentation (erosion/dilation).
+- **K-Fold Cross-Validation**: Robust evaluation using Stratified K-Fold.
+- **Hyperparameter Tuning**: Integration with Keras Tuner for optimizing model parameters.
+- **Visualization**: Generates training history plots, confusion matrices, and misclassified image examples.
 
-A projekt futtatásához szükséges Python könyvtárak:
+## Installation
 
-```bash
-pip install tensorflow numpy pillow tqdm scikit-learn matplotlib seaborn pandas
-```
+1.  **Clone the repository** (if applicable) or navigate to the project directory.
 
------
-
-### 2\. Adatok Előkészítése
-
-1.  Hozd létre a `data_raw/` mappát a projekt gyökerében.
-
-2.  Töltsd le a nyers adatokat (pl. a Google Drive linkedről) és másold őket a `data_raw/train` és `data_raw/test` mappákba.
-
-    **A várt struktúra:**
-
-    ```
-    data_raw/
-    ├── train/
-    │   ├── Sample001/ (pl. '1'-es osztály képei)
-    │   ├── Sample019/ (pl. '19'-es osztály képei)
-    │   └── ...
-    └── test/
-        ├── Test0001.png
-        ├── Test0002.png
-        └── ...
+2.  **Install the required Python packages**:
+    ```bash
+    pip install .
+    # OR
+    pip install tensorflow numpy pandas pillow tqdm scikit-learn matplotlib seaborn keras-tuner opencv-python-headless
     ```
 
-3.  Futtasd az adat-előkészítő szkriptet. **Ezt csak egyszer kell megtenni.**
+## Usage
 
+### 1. Data Preparation
+
+1.  Create a `data_raw/` directory in the project root.
+2.  Place your raw data into `data_raw/train` and `data_raw/test`.
+    *   **Structure:**
+        ```text
+        data_raw/
+        ├── train/
+        │   ├── Sample001/ (e.g., images for class '0')
+        │   ├── Sample002/ (e.g., images for class '1')
+        │   └── ...
+        └── test/
+            ├── Test0001.png
+            ├── ...
+        ```
+3.  Run the preprocessing script to generate optimized `.npy` files:
     ```bash
     python src/data_preprocessing.py
     ```
+    This creates a `data_processed/` directory containing the processed datasets.
 
-    Ez létrehozza a `data_processed/` mappát a tiszta `.npy` fájlokkal, amiket a modell már fel tud dolgozni.
+### 2. Training a Model
 
------
+The main training script is `src/train.py`. You can specify the model architecture and other parameters.
 
-### 3\. Modell Tanítása
-
-A fő tanító szkript a `src/train.py`. Egy `--run_name` argumentummal vezérelheted, ami egy egyedi almappát hoz létre az eredményeknek a `results/` mappán belül.
-
-**Egy kísérlet futtatása "advanced\_v1" néven:**
-
+**Example: Train the 'advanced' model:**
 ```bash
-python src/train.py --model advanced --epochs 50 --run_name "advanced_v1"
+python src/train.py --model advanced --epochs 50 --run_name "advanced_run_v1"
 ```
 
-**Kísérletezés adatbővítés nélkül:**
-
+**Example: Train without data augmentation:**
 ```bash
 python src/train.py --model advanced --no_augmentation --run_name "advanced_no_aug"
 ```
 
-**A "simple" modell futtatása:**
+**Available Arguments:**
+*   `--model`: Model architecture (`simple`, `advanced`, `mlp`, `hybrid`, `pro_hybrid`, `regularized`, `deep_hybrid`, `resnet`).
+*   `--run_name`: Unique name for the experiment (results will be saved in `results/<run_name>`).
+*   `--epochs`: Number of training epochs (default: 50).
+*   `--batch_size`: Batch size (default: 64).
+*   `--no_augmentation`: Disable real-time data augmentation.
+
+### 3. K-Fold Cross-Validation
+
+To evaluate a model using K-Fold Cross-Validation:
 
 ```bash
-python src/train.py --model simple --run_name "simple_model_v1"
+python src/train_kfold.py --model regularized --folds 5 --epochs 40
 ```
 
-**Ha nem adsz meg `--run_name`-et, automatikusan generál egyet** (pl. `advanced_20251117_220000`).
+### 4. Ensemble Prediction
 
-#### Elérhető argumentumok:
+After running K-Fold training, you can generate an ensemble prediction using all trained fold models:
 
-  * `--model`: Melyik modellt futtassa (`simple`, `advanced`, `mlp`).
-  * `--run_name`: A futtatás egyedi neve. **Ez lesz a mappa neve a `results`-ben.**
-  * `--epochs`: Epoch-ok maximális száma.
-  * `--batch_size`: Batch méret.
-  * `--no_augmentation`: Kikapcsolja a valós idejű adatbővítést.
+```bash
+python src/predict_kfold.py --run_name "kfold_regularized_2025..."
+```
 
------
+### 5. Hyperparameter Tuning
 
-### 4\. Eredmények Kiértékelése
+To optimize the hyperparameters of the Hybrid CNN model:
 
-A tanítás végén az összes kimenet a `results/RUN_NAME` mappába kerül (pl. `results/advanced_v1/`).
+```bash
+python src/tune_hybrid.py
+```
 
-**A mappa tartalma:**
+### 6. Interactive Testing
 
-  * `best_model.keras`: A legjobb validációs pontosságot elért, betanított modell.
-  * `history.png`: A tanítási és validációs pontosság/hiba görbéi.
-  * `misclassified.png`: Példák a validációs adathalmazból, amiket a modell elrontott.
-  * `submission.csv`: A végső, beadandó fájl a `test` adatokra adott jóslatokkal.
-  * `validation_report.txt`: Egy részletes kiértékelés (precision, recall) a validációs adatokon.
+You can test your models interactively by drawing on a canvas:
+
+**Single Model Tester:**
+```bash
+python interactive_tester.py --run_name "advanced_run_v1"
+```
+
+**Ensemble Model Tester:**
+```bash
+python interactive_ensemble_tester.py --runs "model1_folder" "model2_folder"
+```
+
+## Results
+
+All training results are saved in the `results/` directory, organized by run name. Each run directory contains:
+*   `best_model.keras`: The saved model with the highest validation accuracy.
+*   `history.png`: Training and validation accuracy/loss curves.
+*   `confusion_matrix.png`: Confusion matrix of the validation set keys.
+*   `misclassified.png`: Examples of misclassified images.
+*   `submission.csv`: Predictions for the test set.
+*   `validation_report.txt`: Detailed classification report.
+
+## License
+
+This project is open-source and available under the standard MIT license.
