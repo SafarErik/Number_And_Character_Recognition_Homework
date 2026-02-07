@@ -106,8 +106,17 @@ def main():
             probs = model.predict(img_input, verbose=0)
             all_probs.append(probs)
 
-        # Convert to NumPy array for weighting
-        stacked_probs = np.array(all_probs)  # Shape: (Models, 1, 62)
+        # Validate shapes before stacking
+        if not all_probs:
+             raise ValueError("No predictions were generated (all_probs is empty).")
+
+        first_shape = all_probs[0].shape
+        for i, p in enumerate(all_probs):
+            if p.shape != first_shape:
+                raise ValueError(f"Shape mismatch! Model {i} output shape {p.shape} differs from Model 0 {first_shape}. Ensure all models have the same output class count.")
+
+        # Stack safely
+        stacked_probs = np.stack(all_probs, axis=0)  # Shape: (Models, 1, NumClasses)
         # Remove extra dimension (1) from shape
         stacked_probs = np.squeeze(stacked_probs, axis=1)
 

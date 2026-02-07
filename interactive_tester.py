@@ -79,11 +79,13 @@ class App:
         self.label_result.pack(pady=20)
 
     def paint(self, event):
-        x1, y1 = (event.x - 1), (event.y - 1)
-        x2, y2 = (event.x + 1), (event.y + 1)
-        self.canvas.create_oval(x1, y1, x2, y2, fill="black", width=BRUSH_SIZE, outline="black")
-        self.draw.ellipse([event.x - BRUSH_SIZE // 2, event.y - BRUSH_SIZE // 2,
-                           event.x + BRUSH_SIZE // 2, event.y + BRUSH_SIZE // 2], fill=0)
+        # Match canvas (screen) to PIL (model input)
+        r = BRUSH_SIZE // 2
+        x1, y1 = (event.x - r), (event.y - r)
+        x2, y2 = (event.x + r), (event.y + r)
+        
+        self.canvas.create_oval(x1, y1, x2, y2, fill="black", outline="black")
+        self.draw.ellipse([x1, y1, x2, y2], fill=0)
 
     def clear(self):
         self.canvas.delete("all")

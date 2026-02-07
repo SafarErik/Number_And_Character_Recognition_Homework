@@ -105,16 +105,7 @@ def main():
             successful_filenames.append(image_name)
         else:
             final_predictions.append(0)
-            successful_filenames.append(image_name) # Fallback to 0 still counts as a prediction? 
-            # Wait, the prompt says: "create and use a separate successful_filenames list... and append image_name only when you successfully process and append a prediction... (keep failed_images as-is for errors)"
-            # My previous change in Step 58 removed "final_predictions.append(0)" from the EXCEPTION block.
-            # But here in the "else" of "if all_probs:", it means NO model predicted anything? That's weird if models are loaded.
-            # If all_probs is empty, we probably shouldn't append to successful_filenames either?
-            # But the loop iterates models. If models is empty, all_probs is empty.
-            # Let's assume if we get here, we have a prediction.
-            # Actually, if all_probs is empty, we effectively failed to predict.
-            # But the prompt instruction regarding "append image_name only when you successfully process" refers to the try/except block failure.
-            # Let's stick to the prompt: append to successful_filenames when we append to final_predictions.
+            # Fallback to 0 if no predictions (though this branch is unlikely if models loaded)
 
     # 4. Save
     if not os.path.exists(os.path.join(RESULTS_DIR, args.run_name)):
