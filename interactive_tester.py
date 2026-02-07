@@ -26,12 +26,12 @@ def get_character_from_label(label):
     Returns the actual character based on the numeric label.
     """
     label = int(label)
-    if 1 <= label <= 10:
-        return chr(ord('0') + (label - 1))
-    elif 11 <= label <= 36:
-        return chr(ord('A') + (label - 11))
-    elif 37 <= label <= 62:
-        return chr(ord('a') + (label - 37))
+    if 0 <= label <= 9:
+        return str(label)
+    elif 10 <= label <= 35:
+        return chr(ord('A') + (label - 10))
+    elif 36 <= label <= 61:
+        return chr(ord('a') + (label - 36))
     else:
         return "?"
 
@@ -44,17 +44,13 @@ class App:
         print(f"Building model structure and loading weights from: {MODEL_PATH}...")
 
         try:
-            # STEP 1: Build the empty model from code
-            self.model = build_deep_hybrid_cnn(input_shape=(IMG_SIZE, IMG_SIZE, 1), num_classes=NUM_CLASSES)
-
-            # STEP 2: Load only the weights
-            self.model.load_weights(MODEL_PATH)
-
-            print("✅ Model and weights loaded successfully!")
+            # Load the entire model (architecture + weights)
+            self.model = tf.keras.models.load_model(MODEL_PATH)
+            print("✅ Model loaded successfully!")
 
         except Exception as e:
-            print(f"\nCRITICAL ERROR: Failed to load weights: {e}")
-            print("Check if you are using the 'deep_hybrid' model!")
+            print(f"\nCRITICAL ERROR: Failed to load model: {e}")
+            print("Ensure the file is a valid .keras full model file.")
             self.root.destroy()
             return
 

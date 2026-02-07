@@ -144,13 +144,15 @@ def create_visualization_sample(train_dir, output_vis_dir, target_folder='Sample
 
     os.makedirs(output_vis_dir, exist_ok=True)
     # Clean up previous visualizations
+    # Clean up previous visualizations
     for f in os.listdir(output_vis_dir):
+        file_path = os.path.join(output_vis_dir, f)
         try:
-            os.path.join(output_vis_dir, f) # Logic check, not actual removal here to be safe?
-            # actually let's remove it as in original code
-            os.remove(os.path.join(output_vis_dir, f))
-        except Exception:
-            pass
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+            # If you want to handle directories, use shutil.rmtree here
+        except OSError as e:
+            print(f"Error removing {file_path}: {e}")
 
     try:
         # 1. Original Image (White background)

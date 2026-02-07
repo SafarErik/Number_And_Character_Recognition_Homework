@@ -1,18 +1,20 @@
 import tkinter as tk
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 import numpy as np
 import tensorflow as tf
 import os
 import argparse
 
 # --- Configuration ---
-IMG_SIZE = 32
+IMG_SIZE = 64
 BRUSH_SIZE = 8
 
 # Argument parser
 parser = argparse.ArgumentParser(description='Interactive ENSEMBLE Tester.')
 parser.add_argument('--runs', nargs='+', required=True,
                     help='Folder names of the models (e.g., expert_size expert_shape ...)')
+parser.add_argument('--ensemble-weights', type=str, default=None,
+                    help='Comma-separated weights (e.g. "0.6,0.2,0.2"). Must sum to 1.')
 args = parser.parse_args()
 
 
@@ -103,7 +105,10 @@ class EnsembleApp:
 
     def predict(self):
         # Preparation
-        img_resized = self.image.resize((IMG_SIZE, IMG_SIZE), Image.Resampling.LANCZOS)
+        # 1. Invert (White bg -> Black bg)
+        img_inverted = ImageOps.invert(self.image)
+        
+        img_resized = img_inverted.resize((IMG_SIZE, IMG_SIZE), Image.Resampling.LANCZOS)
         img_array = np.array(img_resized)
         img_array = img_array / 255.0
         img_ready = img_array.reshape(1, IMG_SIZE, IMG_SIZE, 1)
@@ -127,10 +132,27 @@ class EnsembleApp:
             details_text += f"{name_short}: '{p_char}' ({p_conf:.1f}%)\n"
 
         # Weighting
-        if len(self.models) == 3:
+        # Weighting
+        weights = None
+        
+        if args.ensemble_weights:
+            try:
+                # Parse CLI weights
+                w_list = [float(x) for x in args.ensemble_weights.split(',')]
+                if len(w_list) != len(self.models):
+                    print(f"WARNING: Weights count ({len(w_list)}) != Models count ({len(self.models)}). Ignoring weights.")
+                elif not np.isclose(sum(w_list), 1.0):
+                     print(f"WARNING: Weights sum to {sum(w_list)}, not 1.0. Ignoring weights.")
+                else:
+                    weights = w_list
+            except ValueError:
+                print("ERROR: Could not parse ensemble weights. Using defaults/average.")
+
+        if weights is None and len(self.models) == 3:
             weights = [0.6, 0.2, 0.2]
-        else:
-            weights = None
+            print(f"Using default weights for 3 models: {weights}")
+            for i, name in enumerate(self.model_names):
+                print(f"  - Model {i} ({name}): {weights[i]}")
 
         # Averaging
         avg_probs = np.average(np.array(all_probs), axis=0, weights=weights)

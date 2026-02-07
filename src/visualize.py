@@ -96,8 +96,8 @@ def save_misclassified_plot(model, X_val, y_val_true_labels, file_path, num_imag
     for j in range(i + 1, len(axes)):
         axes[j].axis('off')
 
-    plt.tight_layout(pad=2.0)
+    plt.tight_layout()
     plt.suptitle("Examples of Misclassified Predictions", fontsize=16, y=1.03)
-    plt.savefig(file_path)
+    plt.savefig(file_path, bbox_inches='tight')
     print(f"Misclassified predictions plot saved: {file_path}")
     plt.close()

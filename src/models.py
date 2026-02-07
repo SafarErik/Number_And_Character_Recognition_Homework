@@ -18,7 +18,8 @@ def build_simple_cnn(input_shape, num_classes):
     model.add(Flatten())
     model.add(Dense(128, activation='relu'))
     model.add(Dropout(0.5))
-    model.add(Dense(num_classes, activation='softmax'))
+    model.add(Dense(num_classes))
+    model.add(Activation('softmax', dtype='float32'))
 
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
     return model
@@ -54,7 +55,8 @@ def build_advanced_cnn(input_shape, num_classes):
     model.add(Activation('relu'))
     model.add(Dropout(0.5))
 
-    model.add(Dense(num_classes, activation='softmax'))
+    model.add(Dense(num_classes))
+    model.add(Activation('softmax', dtype='float32'))
 
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
     return model
@@ -69,7 +71,8 @@ def build_keras_mlp(input_shape, num_classes):
     model.add(Dropout(0.3))
     model.add(Dense(128, activation='relu'))
     model.add(Dropout(0.3))
-    model.add(Dense(num_classes, activation='softmax'))
+    model.add(Dense(num_classes))
+    model.add(Activation('softmax', dtype='float32'))
 
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
     return model
@@ -110,7 +113,8 @@ def build_hybrid_cnn(input_shape, num_classes):
     model.add(Activation('relu'))
     model.add(Dropout(0.5))
 
-    model.add(Dense(num_classes, activation='softmax'))
+    model.add(Dense(num_classes))
+    model.add(Activation('softmax', dtype='float32'))
 
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
     return model
@@ -160,7 +164,8 @@ def build_pro_hybrid_cnn(input_shape, num_classes):
     model.add(Activation('swish'))
     model.add(Dropout(0.5))
 
-    model.add(Dense(num_classes, activation='softmax'))
+    model.add(Dense(num_classes))
+    model.add(Activation('softmax', dtype='float32'))
 
     loss_fn = tf.keras.losses.CategoricalCrossentropy(label_smoothing=0.1)
 
@@ -221,7 +226,8 @@ def build_regularized_hybrid_cnn(input_shape, num_classes):
 
     model.add(Dropout(0.55))
 
-    model.add(Dense(num_classes, activation='softmax'))
+    model.add(Dense(num_classes))
+    model.add(Activation('softmax', dtype='float32'))
 
     loss_fn = tf.keras.losses.CategoricalCrossentropy(label_smoothing=0.1)
 
@@ -251,7 +257,8 @@ def build_resnet_transfer(input_shape, num_classes):
         base_model,
         GlobalAveragePooling2D(),
         Dropout(0.5),
-        Dense(num_classes, activation='softmax')
+        Dense(num_classes),
+        Activation('softmax', dtype='float32')
     ])
 
     # Small learning rate for fine-tuning
@@ -325,7 +332,8 @@ def build_deep_hybrid_cnn(input_shape, num_classes):
 
     model.add(Dropout(0.6))  # Strong dropout for safety
 
-    model.add(Dense(num_classes, activation='softmax'))
+    model.add(Dense(num_classes))
+    model.add(Activation('softmax', dtype='float32'))
 
     # Label smoothing for clearer boundaries
     loss_fn = tf.keras.losses.CategoricalCrossentropy(label_smoothing=0.1)

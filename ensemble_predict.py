@@ -86,11 +86,23 @@ def main():
         all_probs = []
         for model in models:
             # Adjust input shape if necessary (though IMG_SIZE should trigger resize match)
-            # Check model input shape to be safe?
-            # model_img_size = model.input_shape[1]
-            # if model_img_size != IMG_SIZE: ... (Skipping for now assuming consistency)
+            # Check model input shape
+            # shape is usually (None, H, W, C)
+            input_shape = model.input_shape
+            model_h, model_w = input_shape[1], input_shape[2]
 
-            probs = model.predict(img_ready, verbose=0)
+            img_input = img_ready
+
+            # Resize if necessary
+            if img_ready.shape[1] != model_h or img_ready.shape[2] != model_w:
+                # We need to resize the original image or the array
+                # Since img_ready is (1, SIZE, SIZE, 1), we can interpolate via TF or just resize
+                # faster to use tf.image.resize
+                img_tensor = tf.convert_to_tensor(img_ready, dtype=tf.float32)
+                img_resized = tf.image.resize(img_tensor, (model_h, model_w))
+                img_input = img_resized.numpy()
+            
+            probs = model.predict(img_input, verbose=0)
             all_probs.append(probs)
 
         # Convert to NumPy array for weighting

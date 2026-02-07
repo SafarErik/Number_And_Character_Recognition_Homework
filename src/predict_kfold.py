@@ -66,6 +66,7 @@ def main():
 
     print(f"Starting prediction on {len(test_filenames)} images...")
     final_predictions = []
+    failed_images = []
 
     # 3. Iterate over images
     for image_name in tqdm(test_filenames, desc="K-Fold Ensemble"):
@@ -75,8 +76,8 @@ def main():
             # Load original image
             img_original = Image.open(image_path).convert('L')
         except Exception as e:
-            # If image loading fails, append default class 0 or skip
-            final_predictions.append(0)
+            print(f"ERROR processing {image_path}: {e}")
+            failed_images.append(image_name)
             continue
 
         all_probs = []
